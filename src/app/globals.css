@@ -14,11 +14,76 @@
   color-scheme: dark;
 }
 
+html {
+  scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
-  transition: background-color 0.25s ease, color 0.25s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ========================================================
+   Global Hand Cursor (cursor: pointer) on All Clickable Elements
+   "jha click honey ka ho vha hand vala cursur bun jaiye okay"
+   ======================================================== */
+button,
+a,
+select,
+summary,
+details summary,
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"]::file-selector-button,
+label[for],
+[role="button"],
+[role="tab"],
+[role="switch"],
+[role="menuitem"],
+[role="option"],
+[role="link"],
+[onclick],
+.cursor-pointer,
+nav a,
+nav button,
+header a,
+header button,
+aside a,
+aside button,
+table button,
+table a,
+form button {
+  cursor: pointer !important;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[aria-disabled="true"],
+.disabled {
+  cursor: not-allowed !important;
+  opacity: 0.65;
+}
+
+/* Instant micro-feedback on click */
+button:active:not(:disabled),
+a:active,
+[role="button"]:active:not([aria-disabled="true"]) {
+  transform: scale(0.985);
+  transition: transform 0.05s ease-out;
 }
 
 /* ========================================================

@@ -1,15 +1,29 @@
 import mysql from "mysql2/promise";
 import bcrypt from "bcrypt";
 
-export const db = mysql.createPool({
-  host: process.env.MYSQL_HOST || "localhost",
-  user: process.env.MYSQL_USER || "root",
-  password: process.env.MYSQL_PASSWORD || "",
-  database: process.env.MYSQL_DATABASE || "repnexa",
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
+const globalForDb = globalThis as unknown as {
+  dbPool?: mysql.Pool;
+};
+
+export const db =
+  globalForDb.dbPool ??
+  mysql.createPool({
+    host: process.env.MYSQL_HOST || "localhost",
+    user: process.env.MYSQL_USER || "root",
+    password: process.env.MYSQL_PASSWORD || "",
+    database: process.env.MYSQL_DATABASE || "repnexa",
+    waitForConnections: true,
+    connectionLimit: 25,
+    maxIdle: 15,
+    idleTimeout: 60000,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForDb.dbPool = db;
+}
 
 // Comprehensive Database Schema & Seed Initializer
 export async function initDb() {
