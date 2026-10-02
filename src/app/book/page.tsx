@@ -4,6 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
+
 export default async function BookingPage({ searchParams }: { searchParams?: Promise<{ category?: string; service?: string }> }) {
   const sp = searchParams ? await searchParams : {};
   // Fetch dynamic categories, services, brands, and cities from MySQL
@@ -15,15 +17,16 @@ export default async function BookingPage({ searchParams }: { searchParams?: Pro
   async function handleBooking(formData: FormData) {
     "use server";
     const res = await createServiceRequest(formData);
+
     if (res.success && res.leadCode) {
       redirect(`/customer/dashboard?leadCode=${res.leadCode}`);
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors">
       {/* Top Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shadow-xs">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center">
             <div className="relative w-40 h-10 flex-shrink-0">
@@ -36,10 +39,11 @@ export default async function BookingPage({ searchParams }: { searchParams?: Pro
               />
             </div>
           </Link>
-          <div className="flex items-center space-x-4 text-sm font-medium">
-            <Link href="/" className="text-slate-600 hover:text-slate-900">Home</Link>
-            <Link href="/become-partner" className="text-purple-600 hover:text-purple-800 font-semibold">Join as Partner</Link>
-            <Link href="/customer/dashboard" className="px-3 py-1.5 rounded-md bg-slate-100 text-slate-800 hover:bg-slate-200">My Bookings</Link>
+          <div className="flex items-center space-x-3 text-sm font-medium">
+            <Link href="/" className="text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white">Home</Link>
+            <ThemeToggle />
+            <Link href="/become-partner" className="text-purple-600 dark:text-purple-400 hover:text-purple-800 font-semibold">Join as Partner</Link>
+            <Link href="/customer/dashboard" className="px-3 py-1.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700">My Bookings</Link>
           </div>
         </div>
       </header>

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import Link from "next/link";
 import Image from "next/image";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import CustomerDashboardClient, { BookingRecord } from "@/components/customer/CustomerDashboardClient";
 
 export default async function CustomerDashboardPage({
@@ -76,9 +77,9 @@ export default async function CustomerDashboardPage({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/80 text-slate-800 font-sans selection:bg-purple-100 selection:text-purple-900">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans selection:bg-purple-100 dark:selection:bg-purple-900 transition-colors duration-200">
       {/* Top Navbar */}
-      <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40 shadow-xs">
+      <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-40 shadow-xs transition-colors duration-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-2">
             <div className="relative w-36 sm:w-44 h-10 flex-shrink-0">
@@ -92,16 +93,17 @@ export default async function CustomerDashboardPage({
             </div>
           </Link>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <ThemeToggle />
             <Link
               href="/"
-              className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors hidden sm:block"
+              className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors hidden sm:block"
             >
               Home
             </Link>
             <Link
               href="/become-partner"
-              className="text-xs font-semibold text-purple-700 hover:text-purple-800 px-3 py-2 rounded-xl hover:bg-purple-50 transition-colors hidden sm:block"
+              className="text-xs font-semibold text-purple-700 dark:text-purple-400 hover:text-purple-800 px-3 py-2 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-colors hidden sm:block"
             >
               Join as Partner
             </Link>

@@ -15,6 +15,8 @@ const getCategoryFallbackImage = (title: string = "") => {
   return "/categories/ac.jpg";
 };
 
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
+
 export default async function ServicesPage() {
   const [categories]: any = await db.query("SELECT * FROM categories WHERE status = 'Active' ORDER BY id ASC");
   const [services]: any = await db.query(`
@@ -25,9 +27,9 @@ export default async function ServicesPage() {
   `);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors">
       {/* Top Navbar with logo */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center">
             <div className="relative w-44 h-12 flex-shrink-0">
@@ -40,8 +42,9 @@ export default async function ServicesPage() {
               />
             </div>
           </Link>
-          <div className="flex items-center space-x-4 text-xs font-bold">
-            <Link href="/" className="text-slate-600 hover:text-slate-900">Home</Link>
+          <div className="flex items-center space-x-3 text-xs font-bold">
+            <Link href="/" className="text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white">Home</Link>
+            <ThemeToggle />
             <Link href="/book" className="px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white shadow-xs">
               Book Technician
             </Link>

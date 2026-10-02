@@ -3,6 +3,7 @@ import { submitPartnerApplication } from "@/app/actions/portal-actions";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { FileUpload } from "@/components/ui/FileUpload";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export default async function BecomePartnerPage({
   searchParams,
@@ -40,8 +41,8 @@ export default async function BecomePartnerPage({
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 py-10 px-4 sm:px-6 lg:px-8 transition-colors">
+      <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
         {/* Banner */}
         <div className="bg-gradient-to-r from-orange-600 via-pink-600 to-purple-700 px-6 py-8 text-white">
           <div className="flex justify-between items-center">
@@ -54,9 +55,12 @@ export default async function BecomePartnerPage({
                 Get high-paying verified customer leads daily in your city with low commissions & transparent wallet system.
               </p>
             </div>
-            <Link href="/" className="hidden sm:inline-block text-xs bg-white text-slate-800 font-bold px-4 py-2 rounded-lg hover:bg-slate-100">
-              Back to Home
-            </Link>
+            <div className="flex items-center space-x-3">
+              <ThemeToggle />
+              <Link href="/" className="hidden sm:inline-block text-xs bg-white text-slate-800 font-bold px-4 py-2 rounded-lg hover:bg-slate-100">
+                Back to Home
+              </Link>
+            </div>
           </div>
         </div>
 

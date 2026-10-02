@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { loginUser } from "@/app/actions/auth-actions";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export type PortalType = "partner" | "super-admin" | "admin" | "unified";
 export type AccentColor = "orange" | "purple" | "blue" | "emerald";
@@ -108,35 +109,35 @@ const COLOR_CLASSES: Record<AccentColor, {
 }> = {
   orange: {
     selection: "selection:bg-orange-500",
-    button: "bg-orange-600 hover:bg-orange-500",
-    demoBtn: "bg-orange-600 hover:bg-orange-500",
-    focusBorder: "focus:border-orange-500",
-    toggleText: "text-orange-400 hover:text-orange-300",
-    registerLink: "text-orange-400 hover:text-orange-300",
+    button: "bg-orange-600 hover:bg-orange-700 dark:bg-orange-600 dark:hover:bg-orange-500 text-white",
+    demoBtn: "bg-orange-600 hover:bg-orange-700 text-white",
+    focusBorder: "focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20",
+    toggleText: "text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300",
+    registerLink: "text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300",
   },
   purple: {
     selection: "selection:bg-purple-600",
-    button: "bg-purple-600 hover:bg-purple-500",
-    demoBtn: "bg-purple-600 hover:bg-purple-500",
-    focusBorder: "focus:border-purple-500",
-    toggleText: "text-purple-400 hover:text-purple-300",
-    registerLink: "text-purple-400 hover:text-purple-300",
+    button: "bg-purple-600 hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-500 text-white",
+    demoBtn: "bg-purple-600 hover:bg-purple-700 text-white",
+    focusBorder: "focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20",
+    toggleText: "text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300",
+    registerLink: "text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300",
   },
   blue: {
     selection: "selection:bg-blue-600",
-    button: "bg-blue-600 hover:bg-blue-500",
-    demoBtn: "bg-blue-600 hover:bg-blue-500",
-    focusBorder: "focus:border-blue-500",
-    toggleText: "text-blue-400 hover:text-blue-300",
-    registerLink: "text-blue-400 hover:text-blue-300",
+    button: "bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white",
+    demoBtn: "bg-blue-600 hover:bg-blue-700 text-white",
+    focusBorder: "focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20",
+    toggleText: "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300",
+    registerLink: "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300",
   },
   emerald: {
     selection: "selection:bg-emerald-600",
-    button: "bg-emerald-600 hover:bg-emerald-500",
-    demoBtn: "bg-emerald-600 hover:bg-emerald-500",
-    focusBorder: "focus:border-emerald-500",
-    toggleText: "text-emerald-400 hover:text-emerald-300",
-    registerLink: "text-emerald-400 hover:text-emerald-300",
+    button: "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white",
+    demoBtn: "bg-emerald-600 hover:bg-emerald-700 text-white",
+    focusBorder: "focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20",
+    toggleText: "text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300",
+    registerLink: "text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300",
   },
 };
 
@@ -213,11 +214,16 @@ function LoginFormInternal({
   };
 
   return (
-    <div className={`min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 ${colors.selection} selection:text-white`}>
+    <div className={`min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col items-center justify-center p-4 relative transition-colors duration-200 ${colors.selection} selection:text-white`}>
+      {/* Top Bar with Theme Toggle */}
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center space-x-2">
+        <ThemeToggle showLabel={true} />
+      </div>
+
       <div className="w-full max-w-sm">
         {/* Brand Logo */}
         <div className="text-center mb-6">
-          <Link href="/" className="inline-block p-2.5 bg-white rounded-xl shadow-md hover:opacity-90 transition-opacity mb-4">
+          <Link href="/" className="inline-block p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs hover:opacity-90 transition-all mb-4">
             <div className="relative w-36 h-9">
               <Image 
                 src="/logo.png" 
@@ -228,16 +234,16 @@ function LoginFormInternal({
               />
             </div>
           </Link>
-          <h1 className="text-xl font-bold text-white tracking-tight">{resolvedTitle}</h1>
-          <p className="text-xs text-slate-400 mt-1">{resolvedSubtitle}</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">{resolvedTitle}</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{resolvedSubtitle}</p>
         </div>
 
         {/* Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-7 shadow-lg transition-colors">
           {/* Quick Demo Fill Button */}
           {resolvedDemo && (
-            <div className="mb-4 flex items-center justify-between p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-xs">
-              <span className="text-slate-400 font-mono text-2xs truncate">{resolvedDemo.email}</span>
+            <div className="mb-4 flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs">
+              <span className="text-slate-600 dark:text-slate-400 font-mono text-2xs truncate">{resolvedDemo.email}</span>
               <button
                 type="button"
                 onClick={handleFillDemo}
@@ -249,31 +255,31 @@ function LoginFormInternal({
           )}
 
           {error && (
-            <div className="mb-4 p-2.5 rounded-lg bg-red-950/60 border border-red-800/80 text-red-300 text-xs text-center">
+            <div className="mb-4 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/80 text-rose-700 dark:text-rose-300 text-xs text-center font-medium">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">{resolvedEmailLabel}</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{resolvedEmailLabel}</label>
               <input
                 type="text"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={resolvedEmailPlaceholder}
-                className={`w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-sm placeholder-slate-500 focus:outline-none ${colors.focusBorder}`}
+                className={`w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none ${colors.focusBorder} transition-colors`}
               />
             </div>
 
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="block text-xs font-medium text-slate-300">Password</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Password</label>
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className={`text-2xs ${colors.toggleText} cursor-pointer transition-colors`}
+                  className={`text-2xs ${colors.toggleText} cursor-pointer transition-colors font-medium`}
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>
@@ -284,22 +290,22 @@ function LoginFormInternal({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className={`w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-sm placeholder-slate-500 focus:outline-none ${colors.focusBorder} font-mono`}
+                className={`w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none ${colors.focusBorder} font-mono transition-colors`}
               />
             </div>
 
             <button
               type="submit"
               disabled={isPending}
-              className={`w-full py-2.5 px-4 rounded-lg text-xs font-bold uppercase tracking-wider text-white ${colors.button} active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer mt-2`}
+              className={`w-full py-2.5 px-4 rounded-lg text-xs font-bold uppercase tracking-wider text-white ${colors.button} active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer mt-2 shadow-xs`}
             >
               {isPending ? "Signing In..." : "Sign In"}
             </button>
           </form>
 
           {/* Footer Navigation */}
-          <div className={`mt-5 pt-3 border-t border-slate-800 flex items-center ${resolvedRegister ? "justify-between" : "justify-center"} text-xs`}>
-            <Link href="/" className="text-slate-400 hover:text-white transition-colors">
+          <div className={`mt-5 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center ${resolvedRegister ? "justify-between" : "justify-center"} text-xs`}>
+            <Link href="/" className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors font-medium">
               {backHomeText}
             </Link>
             {resolvedRegister && (
@@ -317,8 +323,8 @@ function LoginFormInternal({
 export function AuthLoginForm(props: AuthLoginFormProps) {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-slate-700 border-t-white rounded-full animate-spin" />
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-slate-300 dark:border-slate-700 border-t-purple-600 rounded-full animate-spin" />
       </div>
     }>
       <LoginFormInternal {...props} />

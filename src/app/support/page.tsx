@@ -3,6 +3,7 @@ import Image from "next/image";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export default async function SupportPage({
   searchParams,
@@ -35,6 +36,7 @@ export default async function SupportPage({
             </div>
           </Link>
           <div className="flex items-center space-x-3 text-xs font-bold">
+            <ThemeToggle />
             <Link href="/" className="text-slate-600 hover:text-slate-900">Home</Link>
             <Link href="/customer/dashboard" className="text-slate-600 hover:text-slate-900 hidden sm:inline">Track Booking</Link>
             <Link href="/book" className="px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white shadow-xs">
