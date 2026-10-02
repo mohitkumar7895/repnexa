@@ -28,9 +28,6 @@ export function Navbar() {
           <Link href="/customer/dashboard" className="hover:text-purple-600 transition-colors">
             Track Booking
           </Link>
-          <Link href="/support" className="hover:text-purple-600 transition-colors">
-            Support
-          </Link>
           <Link href="/become-partner" className="text-orange-600 hover:text-orange-700 transition-colors">
             Partner with Us
           </Link>
