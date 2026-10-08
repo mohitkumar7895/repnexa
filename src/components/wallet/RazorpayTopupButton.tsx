@@ -55,7 +55,6 @@ export function RazorpayTopupButton({ partnerId, partnerName = "Service Partner"
 
       const scriptLoaded = await loadRazorpayScript();
 
-      // If Razorpay keys are configured and script loaded successfully
       if (orderRes.isConfigured && scriptLoaded && window.Razorpay) {
         const options = {
           key: orderRes.keyId,
@@ -99,25 +98,8 @@ export function RazorpayTopupButton({ partnerId, partnerName = "Service Partner"
         const rzp = new window.Razorpay(options);
         rzp.open();
       } else {
-        // Fallback simulation when keys in .env are placeholder
-        const simulatedPaymentId = `pay_sim_${Date.now()}`;
-        const verifyRes = await verifyAndApplyWalletPayment({
-          partnerId,
-          amount: finalAmount,
-          orderId: orderRes.orderId,
-          paymentId: simulatedPaymentId,
-        });
-
         setIsLoading(false);
-        if (verifyRes.success) {
-          setFeedback({
-            type: "success",
-            text: `[Razorpay Ready] ₹${finalAmount.toLocaleString("en-IN")} credited to float! (Txn: ${simulatedPaymentId}). Add real keys in .env anytime.`,
-          });
-          if (onSuccess) onSuccess();
-        } else {
-          setFeedback({ type: "error", text: verifyRes.error || "Failed to process simulation." });
-        }
+        setFeedback({ type: "error", text: "Payment window could not open. Online payment is not set up." });
       }
     } catch (err: any) {
       setIsLoading(false);

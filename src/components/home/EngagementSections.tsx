@@ -21,7 +21,7 @@ export function CustomerReviews({ reviews }: { reviews: ReviewItem[] }) {
               Verified Customer Feedback
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Real ratings submitted by homeowners across India post service delivery
+              Reviews after a finished visit.
             </p>
           </div>
           <Link href="/customer/dashboard" className="text-xs font-bold text-purple-700 hover:text-purple-900">
@@ -71,15 +71,15 @@ export function PartnerCta() {
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight">
               Are You an Appliance Technician or Workshop Owner?
             </h2>
-            <p className="text-slate-300 text-sm max-w-2xl leading-relaxed">
-              Join Repnexa as an authorized Service Partner. Receive qualified customer leads in your hub, keep 85% of job billings, and withdraw your earnings directly to your bank account daily.
+            <p className="text-slate-300 text-sm max-w-xl">
+              ID first. Leads after 4 checks. Commission from 15%.
             </p>
             <div className="flex flex-wrap gap-4 pt-2">
               <Link
                 href="/become-partner"
                 className="px-6 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-purple-600 text-white font-bold text-xs sm:text-sm shadow-lg hover:opacity-95 transition-all"
               >
-                Apply as Partner in 2 Minutes →
+                Apply as a partner
               </Link>
               <Link
                 href="/partner/dashboard"
@@ -99,11 +99,11 @@ export function PartnerCta() {
               </li>
               <li className="flex items-center space-x-2">
                 <span className="text-emerald-400 font-bold">✓</span>
-                <span>Steady customer leads in your chosen pin codes</span>
+                <span>Leads open after the four proof checks pass</span>
               </li>
               <li className="flex items-center space-x-2">
                 <span className="text-emerald-400 font-bold">✓</span>
-                <span>Direct UPI & IMPS bank payouts within 24 hours</span>
+                <span>Bank withdrawal after the wallet minimum is reached</span>
               </li>
               <li className="flex items-center space-x-2">
                 <span className="text-emerald-400 font-bold">✓</span>

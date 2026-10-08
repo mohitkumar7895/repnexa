@@ -36,14 +36,14 @@ export function CategoryGrid({ categories }: { categories: CategoryItem[] }) {
               What Appliance Needs Repair Today?
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-xl">
-              Select any category to book a certified, background-verified technician at standard transparent pricing.
+              Pick a category. Cleared technician only.
             </p>
           </div>
           <Link 
             href="/services" 
             className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-4 py-2.5 rounded-xl border border-purple-200 transition-all"
           >
-            <span>Explore All 30+ Services</span>
+            <span>See the service list</span>
             <span>→</span>
           </Link>
         </div>
@@ -78,7 +78,7 @@ export function CategoryGrid({ categories }: { categories: CategoryItem[] }) {
                   <div className="flex items-center justify-between pt-1 border-t border-slate-100">
                     <span className="text-2xs font-semibold text-emerald-600 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                      Technician Available
+                      Listed repair
                     </span>
                     <span className="text-xs font-bold text-orange-600 group-hover:translate-x-1 transition-transform">
                       Book →

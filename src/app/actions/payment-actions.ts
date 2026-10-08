@@ -3,13 +3,28 @@
 import { db } from "@/lib/db";
 import { createRazorpayOrder, verifyRazorpaySignature, isRazorpayConfigured } from "@/lib/razorpay";
 import { revalidatePath } from "next/cache";
+import { getSession } from "@/lib/auth";
+
+async function walletOwner(partnerId: number) {
+  const session: any = await getSession();
+  if (!session?.id) return "Login required.";
+  if (session.role === "SUPER_ADMIN") return null;
+  const [rows]: any = await db.query("SELECT id FROM partners WHERE user_id = ? LIMIT 1", [session.id]);
+  if (Number(rows?.[0]?.id) !== Number(partnerId)) return "This wallet is not yours.";
+  return null;
+}
 
 export async function createWalletOrderAction(partnerId: number, amount: number) {
   if (amount < 100) {
     return { success: false, error: "Minimum recharge amount is ₹100" };
   }
+  if (!isRazorpayConfigured) {
+    return { success: false, error: "Online payment is not set up. Ask admin to add float." };
+  }
 
   try {
+    const denied = await walletOwner(partnerId);
+    if (denied) return { success: false, error: denied };
     const [pRows]: any = await db.query("SELECT id, business_name, partner_code FROM partners WHERE id = ?", [partnerId]);
     if (pRows.length === 0) {
       return { success: false, error: "Partner account not found" };
@@ -28,7 +43,10 @@ export async function createWalletOrderAction(partnerId: number, amount: number)
       },
     });
 
-    const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || "rzp_test_YourKeyIdHere";
+    const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || "";
+    if (!keyId || keyId.includes("YourKeyIdHere")) {
+      return { success: false, error: "Online payment is not set up. Ask admin to add float." };
+    }
 
     return {
       success: true,
@@ -59,17 +77,18 @@ export async function verifyAndApplyWalletPayment({
   signature?: string;
 }) {
   try {
-    // 1. Signature Verification
-    if (signature) {
-      const isValid = verifyRazorpaySignature({
-        orderId,
-        paymentId,
-        signature,
-      });
-
-      if (!isValid) {
-        return { success: false, error: "Payment verification failed. Invalid transaction signature." };
-      }
+    const denied = await walletOwner(partnerId);
+    if (denied) return { success: false, error: denied };
+    if (!signature || orderId.startsWith("order_mock_") || paymentId.startsWith("pay_sim_")) {
+      return { success: false, error: "This payment was not verified." };
+    }
+    const isValid = verifyRazorpaySignature({
+      orderId,
+      paymentId,
+      signature,
+    });
+    if (!isValid) {
+      return { success: false, error: "Payment verification failed. Invalid transaction signature." };
     }
 
     // 2. Prevent duplicate credit by checking paymentId in transactions

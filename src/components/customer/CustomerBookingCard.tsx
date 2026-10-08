@@ -1,11 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import CancelBookingButton from "@/components/customer/CancelBookingButton";
 import WarrantyInvoiceModal from "@/components/customer/WarrantyInvoiceModal";
 import CopyBadge from "@/components/customer/CopyBadge";
 import { submitCustomerReview } from "@/app/actions/portal-actions";
 import { BookingRecord, STATUS_CONFIG, getApplianceIcon } from "./customer-types";
+import { RescheduleVisit } from "@/components/customer/RescheduleVisit";
+import { DamageReportForm } from "@/components/customer/DamageReportForm";
+import { SUPPORT_PHONE_DISPLAY } from "@/lib/contact";
 
 interface CustomerBookingCardProps {
   booking: BookingRecord;
@@ -29,7 +33,14 @@ export function CustomerBookingCard({
   };
 
   const canCancel = ["NEW", "MATCHING", "ASSIGNED"].includes(req.status);
+  const canReschedule = canCancel && !req.job_id;
+  const billLines = req.bill_items || [];
+  const billTotal = billLines.reduce((sum, line) => sum + Number(line.qty) * Number(line.price), 0);
   const icon = getApplianceIcon(req.service_title);
+  const technicianCleared = req.partner_kyc_status === "approved"
+    && req.partner_account_status !== "suspended"
+    && req.partner_account_status !== "inactive"
+    && Number(req.partner_passed_checks || 0) >= 4;
 
   return (
     <div
@@ -151,6 +162,11 @@ export function CustomerBookingCard({
             <h3 className="text-base font-black text-slate-900 flex items-center space-x-2">
               <span>{req.service_title || "Appliance Repair"}</span>
             </h3>
+            {Number(req.discount_amount) > 0 && (
+              <p className="mt-1 text-2xs font-semibold text-emerald-700">
+                Coupon {req.coupon_code || "applied"} saves ₹{Number(req.discount_amount).toLocaleString("en-IN")} on the final bill
+              </p>
+            )}
             <div className="mt-2 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 leading-relaxed">
               <span className="font-bold text-slate-900 block text-3xs uppercase tracking-wider text-slate-400 mb-0.5">
                 Problem Reported:
@@ -174,6 +190,11 @@ export function CustomerBookingCard({
                     : "Earliest Available"}{" "}
                   • {req.preferred_time || "Flexible"}
                 </div>
+                {canReschedule && (
+                  <div className="mt-1">
+                    <RescheduleVisit leadId={req.id} phone={req.customer_phone} />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -255,20 +276,67 @@ export function CustomerBookingCard({
                         <h4 className="text-xs font-bold text-slate-900 truncate">
                           {req.partner_name}
                         </h4>
-                        <span className="text-3xs bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">
-                          ✓ Verified
-                        </span>
+                        {technicianCleared ? (
+                          <span className="text-3xs bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                            Doorstep cleared
+                          </span>
+                        ) : (
+                          <span className="text-3xs bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-bold">
+                            Not cleared
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center space-x-2 text-3xs text-slate-500 mt-0.5">
-                        <span>⭐ 4.8 Rating</span>
+                        <span>
+                          {Number(req.partner_rating) > 0
+                            ? `★ ${Number(req.partner_rating).toFixed(1)} rating`
+                            : "New on Repnexa"}
+                        </span>
                         <span>•</span>
-                        <span>Repnexa Certified Specialist</span>
+                        <span>
+                          {Number(req.partner_total_jobs) > 0
+                            ? `${req.partner_total_jobs} jobs`
+                            : "No completed jobs yet"}
+                        </span>
                       </div>
                     </div>
                   </div>
 
                   {/* Direct Call Button */}
-                  {req.partner_phone && (
+                  {req.partner_code && (
+                    <Link href={`/verify/${req.partner_code}`} className="mt-3 inline-flex text-2xs font-bold text-purple-700">
+                      Check ID first
+                    </Link>
+                  )}
+
+                  {req.partner_name && req.status !== "COMPLETED" && req.status !== "CANCELLED" && (
+                    <div className="mt-2">
+                      <DamageReportForm leadId={req.id} phone={req.customer_phone} />
+                    </div>
+                  )}
+
+                  {Number(req.bill_requested) === 1 && billLines.length > 0 && (
+                    <div className="mt-2">
+                      <WarrantyInvoiceModal
+                        data={{
+                          leadCode: req.lead_code,
+                          serviceTitle: req.service_title,
+                          brandName: req.brand_name,
+                          customerName: req.customer_name,
+                          customerPhone: req.customer_phone,
+                          customerAddress: req.customer_address,
+                          cityName: req.city_name,
+                          partnerName: req.partner_name,
+                          partnerPhone: req.partner_phone,
+                          completedDate: req.updated_at || req.created_at,
+                          finalAmount: billTotal,
+                          lineItems: billLines,
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {technicianCleared && req.partner_phone && (
                     <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
                       <span className="text-2xs text-slate-500 font-mono">
                         Phone: {req.partner_phone}
@@ -284,8 +352,14 @@ export function CustomerBookingCard({
                   )}
                 </div>
 
-                {/* Doorstep Security OTP Card */}
-                {req.completion_otp && req.status !== "COMPLETED" && (
+                {!technicianCleared && req.partner_name && (
+                  <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs space-y-1">
+                    <p className="font-bold">Do not start.</p>
+                    <p>Not cleared. No OTP. No entry.</p>
+                  </div>
+                )}
+
+                {technicianCleared && req.completion_otp && req.status !== "COMPLETED" && (
                   <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-900 to-slate-900 text-white shadow-md space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-3xs font-black uppercase tracking-widest text-purple-300 flex items-center space-x-1">
@@ -343,23 +417,6 @@ export function CustomerBookingCard({
                         Service has been successfully completed and tested by our certified technician.
                       </p>
                       
-                      <div className="pt-2 border-t border-emerald-200/60">
-                        <WarrantyInvoiceModal
-                          data={{
-                            leadCode: req.lead_code,
-                            serviceTitle: req.service_title,
-                            brandName: req.brand_name,
-                            customerName: req.customer_name,
-                            customerPhone: req.customer_phone,
-                            customerAddress: req.customer_address,
-                            cityName: req.city_name,
-                            partnerName: req.partner_name,
-                            partnerPhone: req.partner_phone,
-                            completedDate: req.updated_at || req.created_at,
-                            finalAmount: req.final_amount || req.selling_price || 499,
-                          }}
-                        />
-                      </div>
                     </div>
 
                     {/* Verified Customer Feedback Form */}
@@ -422,9 +479,9 @@ export function CustomerBookingCard({
                     <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs mx-auto animate-pulse">
                       📡
                     </div>
-                    <div className="text-xs font-bold">Matching Certified Technician...</div>
+                    <div className="text-xs font-bold">Waiting in {req.city_name || "your city"}</div>
                     <p className="text-2xs text-purple-700/80 max-w-xs mx-auto">
-                      Our dispatch engine is notifying verified service experts in {req.city_name}. You will receive partner details shortly.
+                      Name appears here only after a cleared technician accepts.
                     </p>
                   </div>
                 )}
@@ -438,7 +495,7 @@ export function CustomerBookingCard({
               <span>🛡️</span>
               <span>Repnexa Genuine Spares Guarantee</span>
             </span>
-            <span>Assistance: 1800-REPNEXA</span>
+            <span>Assistance: {SUPPORT_PHONE_DISPLAY}</span>
           </div>
         </div>
       </div>

@@ -3,6 +3,22 @@ import Link from "next/link";
 import Image from "next/image";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import CustomerDashboardClient, { BookingRecord } from "@/components/customer/CustomerDashboardClient";
+import { ensurePortalTables } from "@/lib/portal-setup";
+
+function parseBillItems(value: unknown) {
+  if (!value) return [];
+  try {
+    const raw = typeof value === "string" ? JSON.parse(value) : value;
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(Boolean).map((item: any) => ({
+      name: String(item.name || ""),
+      qty: Number(item.qty || 1),
+      price: Number(item.price || 0),
+    }));
+  } catch {
+    return [];
+  }
+}
 
 export default async function CustomerDashboardPage({
   searchParams,
@@ -13,6 +29,7 @@ export default async function CustomerDashboardPage({
   const queryTerm = (resolvedParams.q || resolvedParams.leadCode || resolvedParams.phone || "").trim();
 
   let requests: BookingRecord[] = [];
+  let loadError = "";
 
   const baseSelect = `
     SELECT l.*, 
@@ -20,16 +37,23 @@ export default async function CustomerDashboardPage({
            s.selling_price, 
            s.warranty_days,
            c.name as city_name,
-           p.business_name as partner_name, 
+           p.business_name as partner_name,
+           p.partner_code as partner_code,
+           p.kyc_status as partner_kyc_status,
+           p.status as partner_account_status,
            u.phone as partner_phone,
            p.rating as partner_rating,
            p.total_completed_jobs as partner_total_jobs,
+           (SELECT COUNT(*) FROM partner_verification_checks pvc WHERE pvc.partner_id = p.id AND pvc.status = 'passed') as partner_passed_checks,
            j.id as job_id, 
            j.status as job_status, 
            j.completion_otp, 
            j.before_photo_url, 
            j.after_photo_url,
            j.final_amount,
+           j.bill_requested as bill_requested,
+           (SELECT CONCAT('[', GROUP_CONCAT(JSON_OBJECT('name', bi.item_name, 'qty', bi.qty, 'price', bi.unit_price)), ']')
+            FROM job_bill_items bi WHERE bi.job_id = j.id) as bill_items,
            custUser.email as customer_email
     FROM leads l
     LEFT JOIN services s ON l.service_id = s.id
@@ -41,39 +65,35 @@ export default async function CustomerDashboardPage({
     LEFT JOIN users custUser ON cust.user_id = custUser.id
   `;
 
-  if (queryTerm) {
-    const cleanDigits = queryTerm.replace(/\D/g, "");
-    if (cleanDigits.length >= 7) {
-      // Search by mobile number
+  try {
+    await ensurePortalTables();
+    if (queryTerm) {
+      const cleanDigits = queryTerm.replace(/\D/g, "");
+      const last10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : "";
+      const compactPhone = "REPLACE(REPLACE(REPLACE(REPLACE(l.customer_phone, ' ', ''), '-', ''), '+', ''), '(', '')";
       const [rows]: any = await db.query(
         `
-        ${baseSelect}
-        WHERE l.customer_phone LIKE ? OR l.lead_code = ?
-        ORDER BY l.id DESC
-      `,
-        [`%${cleanDigits}%`, queryTerm]
+          ${baseSelect}
+          WHERE l.lead_code = ?
+             OR (? <> '' AND (
+               l.customer_phone = ?
+               OR l.customer_phone = ?
+               OR l.customer_phone = ?
+               OR ${compactPhone} = ?
+               OR ${compactPhone} = ?
+             ))
+          ORDER BY l.id DESC
+        `,
+        [queryTerm, last10, last10, `+91${last10}`, `91${last10}`, last10, `91${last10}`]
       );
-      requests = rows;
-    } else {
-      // Search by Lead Code
-      const [rows]: any = await db.query(
-        `
-        ${baseSelect}
-        WHERE l.lead_code = ? OR l.customer_phone LIKE ?
-        ORDER BY l.id DESC
-      `,
-        [queryTerm, `%${queryTerm}%`]
-      );
-      requests = rows;
+        requests = (rows || []).map((row: any) => ({
+          ...row,
+          bill_items: parseBillItems(row.bill_items),
+        }));
     }
-  } else {
-    // Default: Show latest customer bookings
-    const [rows]: any = await db.query(`
-      ${baseSelect}
-      ORDER BY l.id DESC
-      LIMIT 15
-    `);
-    requests = rows;
+  } catch {
+    requests = [];
+    loadError = "Bookings could not be loaded. Refresh the page or try your mobile number again.";
   }
 
   return (
@@ -82,12 +102,13 @@ export default async function CustomerDashboardPage({
       <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-40 shadow-xs transition-colors duration-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-2">
-            <div className="relative w-36 sm:w-44 h-10 flex-shrink-0">
+            <div className="relative w-28 sm:w-40 h-9 sm:h-10 shrink-0">
               <Image
                 src="/logo.png"
                 alt="Repnexa Doorstep Care"
                 fill
                 className="object-contain object-left"
+                sizes="176px"
                 priority
               />
             </div>
@@ -109,9 +130,9 @@ export default async function CustomerDashboardPage({
             </Link>
             <Link
               href="/book"
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-purple-600 hover:from-orange-500 hover:to-purple-500 text-white font-bold text-xs shadow-sm hover:shadow transition-all"
+              className="px-3 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs"
             >
-              + Book Repair
+              Book
             </Link>
           </div>
         </div>
@@ -136,7 +157,7 @@ export default async function CustomerDashboardPage({
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
-              Track technician arrival in real-time, view verified doorstep OTP, and manage your completed appliance service records.
+              Search with mobile or booking code. OTP only if the ID is green.
             </p>
 
             {/* Instant Search Bar */}
@@ -181,7 +202,7 @@ export default async function CustomerDashboardPage({
                   href="/customer/dashboard"
                   className="px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/15 text-slate-300 border border-white/10 transition-colors"
                 >
-                  All Recent Bookings
+                  New search
                 </Link>
               </div>
             </div>
@@ -189,6 +210,12 @@ export default async function CustomerDashboardPage({
         </section>
 
         {/* Client Interface: Tabs, KPIs, Stepper, Invoices, Proofs */}
+        {loadError && (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">
+            {loadError}
+          </div>
+        )}
+
         <CustomerDashboardClient
           requests={requests}
           initialQuery={queryTerm}

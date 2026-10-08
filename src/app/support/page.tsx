@@ -23,25 +23,17 @@ export default async function SupportPage({
     <div className="min-h-screen bg-slate-50 text-slate-800">
       {/* Top Header with clean Logo */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center">
-            <div className="relative w-40 h-10 flex-shrink-0">
-              <Image 
-                src="/logo.png" 
-                alt="Repnexa" 
-                fill 
-                className="object-contain object-left" 
-                priority
-              />
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2">
+          <Link href="/" className="min-w-0">
+            <div className="relative w-28 sm:w-40 h-9 sm:h-10">
+              <Image src="/logo.png" alt="Repnexa" fill className="object-contain object-left" priority sizes="160px" />
             </div>
           </Link>
-          <div className="flex items-center space-x-3 text-xs font-bold">
+          <div className="flex items-center gap-1.5 sm:gap-3 text-xs font-bold">
             <ThemeToggle />
-            <Link href="/" className="text-slate-600 hover:text-slate-900">Home</Link>
-            <Link href="/customer/dashboard" className="text-slate-600 hover:text-slate-900 hidden sm:inline">Track Booking</Link>
-            <Link href="/book" className="px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white shadow-xs">
-              Book Service
-            </Link>
+            <Link href="/" className="hidden sm:inline text-slate-600">Home</Link>
+            <Link href="/customer/dashboard" className="hidden sm:inline text-slate-600">Track</Link>
+            <Link href="/book" className="px-3 py-2 rounded-lg bg-orange-600 text-white">Book</Link>
           </div>
         </div>
       </header>
@@ -50,14 +42,12 @@ export default async function SupportPage({
       <main className="max-w-4xl mx-auto px-4 py-12 space-y-10">
         <div className="text-center space-y-3">
           <span className="text-xs font-bold uppercase tracking-widest text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
-            24/7 Operations Desk
+            Helpdesk · 8 AM to 9 PM
           </span>
           <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-            How Can We Assist You Today?
+            Need help?
           </h1>
-          <p className="text-sm text-slate-600 max-w-lg mx-auto">
-            Need help with a technician visit, service scheduling, or billing clarification? Our dedicated escalation desk is active round the clock.
-          </p>
+          <p className="text-sm text-slate-600">Keep your booking code ready.</p>
         </div>
 
         {/* Success Alert Banner if Ticket Submitted */}
@@ -80,9 +70,9 @@ export default async function SupportPage({
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs text-center space-y-2">
             <div className="text-3xl">📞</div>
             <h3 className="font-bold text-slate-900 text-sm">Helpline Number</h3>
-            <p className="text-xs text-slate-500 font-mono font-bold text-purple-700">
+            <a href={`tel:${String(settings['support_phone'] || '+917895094129').replace(/\s/g, '')}`} className="text-xs font-mono font-bold text-purple-700">
               {settings['support_phone'] || '+91 78950 94129'}
-            </p>
+            </a>
             <span className="text-2xs text-slate-400 block">Mon - Sun (8:00 AM - 9:00 PM)</span>
           </div>
 
@@ -92,7 +82,7 @@ export default async function SupportPage({
             <p className="text-xs text-slate-500 font-mono font-bold text-purple-700">
               {settings['support_email'] || 'support@repnexa.com'}
             </p>
-            <span className="text-2xs text-slate-400 block">Response within 2 hours</span>
+            <span className="text-2xs text-slate-400 block">We reply during helpdesk hours</span>
           </div>
 
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs text-center space-y-2">
@@ -136,7 +126,7 @@ export default async function SupportPage({
               </div>
               <div>
                 <label className="block text-2xs font-semibold text-slate-700 uppercase mb-1">Contact Mobile Number *</label>
-                <input type="tel" name="phone" required placeholder="Enter 10-digit mobile number" className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:border-purple-600 focus:outline-none" />
+                <input type="tel" name="phone" required inputMode="numeric" pattern="[6-9][0-9]{9}" title="10-digit mobile number" placeholder="Enter 10-digit mobile number" className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:border-purple-600 focus:outline-none" />
               </div>
             </div>
 

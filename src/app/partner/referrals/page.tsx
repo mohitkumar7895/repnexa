@@ -3,32 +3,13 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ReferralShareButtons } from "@/components/partner/ReferralShareButtons";
+import { getCurrentPartner } from "@/lib/partner";
 import Link from "next/link";
 
 export default async function PartnerReferralsPage() {
-  // Fetch demo partner
-  const [partnerRows]: any = await db.query(`
-    SELECT p.*, c.name as city_name, s.name as state_name, u.phone as contact_phone, u.first_name, u.last_name
-    FROM partners p
-    LEFT JOIN cities c ON p.city_id = c.id
-    LEFT JOIN states s ON p.state_id = s.id
-    LEFT JOIN users u ON p.user_id = u.id
-    WHERE p.partner_code = 'PTR-DEL-1001'
-    LIMIT 1
-  `);
+  const partner = await getCurrentPartner();
 
-  const partner = partnerRows[0] || {
-    id: 1,
-    partner_code: "PTR-DEL-1001",
-    referral_code: "REF-DEL-1001",
-    business_name: "Sharma Cooling Solutions",
-    total_completed_jobs: 128,
-    rating: 4.9,
-    wallet_balance: 2500,
-    tier_level: "GOLD",
-  };
-
-  const referralCode = partner.referral_code || `REF-${partner.partner_code.replace("PTR-", "")}`;
+  const referralCode = partner.referral_code || `REF-${String(partner.partner_code || "PARTNER").replace("PTR-", "")}`;
 
   // Fetch referrals for this partner
   const [referrals]: any = await db.query(`
@@ -44,7 +25,7 @@ export default async function PartnerReferralsPage() {
   const potentialPending = pendingList.reduce((acc: number, cur: any) => acc + Number(cur.reward_amount || 100), 0);
 
   // Dynamic Tier Calculation
-  const jobsDone = partner.total_completed_jobs || 128;
+  const jobsDone = Number(partner.total_completed_jobs) || 0;
   let currentTier = "BRONZE";
   let nextTier = "SILVER";
   let nextTierTarget = 20;
@@ -188,7 +169,7 @@ export default async function PartnerReferralsPage() {
           <div className="text-right">
             <span className="text-2xs uppercase font-bold text-slate-400 block">Performance</span>
             <span className="text-sm font-bold text-slate-900">
-              {jobsDone} Jobs Done • ★ {Number(partner.rating || 4.9).toFixed(1)}
+              {jobsDone} Jobs Done • ★ {Number(partner.rating) > 0 ? Number(partner.rating).toFixed(1) : "—"}
             </span>
           </div>
         </div>

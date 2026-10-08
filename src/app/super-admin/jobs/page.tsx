@@ -3,8 +3,10 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import Image from "next/image";
+import { ensurePortalTables } from "@/lib/portal-setup";
 
 export default async function SuperAdminJobsPage() {
+  await ensurePortalTables();
   const [jobs]: any = await db.query(`
     SELECT j.*, l.lead_code, l.problem_description, s.title as service_title,
            p.business_name as partner_name, p.partner_code,
@@ -18,6 +20,15 @@ export default async function SuperAdminJobsPage() {
     ORDER BY j.id DESC
   `);
 
+  const [billLines]: any = await db.query(`
+    SELECT bi.*, j.job_code, j.bill_requested, p.business_name, p.partner_code
+    FROM job_bill_items bi
+    JOIN jobs j ON j.id = bi.job_id
+    JOIN partners p ON p.id = bi.partner_id
+    ORDER BY bi.id DESC
+    LIMIT 40
+  `);
+
   return (
     <div className="space-y-6">
       <PageHeader 
@@ -25,6 +36,23 @@ export default async function SuperAdminJobsPage() {
         subtitle="Audit technician execution, customer OTP verifications, and Before/After physical repair proofs"
         badge={`${jobs.length} Active & Fulfilled Jobs`}
       />
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2">
+        <h2 className="text-sm font-black text-slate-900">Partner bill lines</h2>
+        {(billLines || []).length === 0 ? (
+          <p className="text-xs text-slate-500">No extra parts saved yet.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {(billLines || []).map((line: any) => (
+              <li key={line.id} className="py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
+                <span className="font-semibold text-slate-900">{line.business_name} · {line.partner_code}</span>
+                <span>{line.job_code}: {line.item_name} × {line.qty}</span>
+                <span className="font-mono">₹{(Number(line.qty) * Number(line.unit_price)).toLocaleString("en-IN")} · {Number(line.bill_requested) === 1 ? "Bill shared" : "Saved only"}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <DataTable title="All Service Jobs & Inspection Proofs" count={jobs.length}>
         <table className="min-w-full divide-y divide-slate-200 text-left text-xs">

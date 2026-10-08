@@ -30,24 +30,16 @@ export default async function ServicesPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors">
       {/* Top Navbar with logo */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <Link href="/" className="flex items-center">
-            <div className="relative w-44 h-12 flex-shrink-0">
-              <Image 
-                src="/logo.png" 
-                alt="Repnexa Logo" 
-                fill 
-                className="object-contain object-left" 
-                priority
-              />
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-2">
+          <Link href="/" className="min-w-0">
+            <div className="relative w-28 sm:w-40 h-9 sm:h-11">
+              <Image src="/logo.png" alt="Repnexa" fill className="object-contain object-left" priority sizes="160px" />
             </div>
           </Link>
-          <div className="flex items-center space-x-3 text-xs font-bold">
-            <Link href="/" className="text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white">Home</Link>
+          <div className="flex items-center gap-1.5 sm:gap-3 text-xs font-bold">
+            <Link href="/" className="hidden sm:inline text-slate-600 dark:text-slate-300">Home</Link>
             <ThemeToggle />
-            <Link href="/book" className="px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white shadow-xs">
-              Book Technician
-            </Link>
+            <Link href="/book" className="px-3 py-2 rounded-lg bg-orange-600 text-white">Book</Link>
           </div>
         </div>
       </header>
@@ -62,7 +54,7 @@ export default async function ServicesPage() {
             Doorstep Appliance Repair & Maintenance
           </h1>
           <p className="text-sm text-slate-500">
-            All services are delivered by police-verified, certified technicians with standard diagnostic procedures.
+            Cleared technicians only.
           </p>
         </div>
 
@@ -85,7 +77,7 @@ export default async function ServicesPage() {
                   </div>
                   <div>
                     <h2 className="text-xl font-black text-slate-900">{cat.title}</h2>
-                    <span className="text-xs text-slate-400 font-medium">Police-verified technicians • 100% Quality Assured</span>
+                    <span className="text-xs text-slate-400 font-medium">Cleared technicians only</span>
                   </div>
                 </div>
                 <Link 

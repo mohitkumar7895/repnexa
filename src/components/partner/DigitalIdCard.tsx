@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { QrCodeSvg } from "@/components/ui/QrCodeSvg";
 import Link from "next/link";
+import { SUPPORT_PHONE_DISPLAY } from "@/lib/contact";
 
 interface DigitalIdCardProps {
   partner: {
@@ -15,6 +16,7 @@ interface DigitalIdCardProps {
     city_name?: string;
     state_name?: string;
     kyc_status?: string;
+    cleared?: boolean;
     tier_level?: string;
     experience_years?: number;
     created_at?: string;
@@ -29,7 +31,8 @@ export function DigitalIdCard({ partner }: DigitalIdCardProps) {
   const verifyUrl = `${baseUrl}/verify/${partner.partner_code}`;
 
   const fullName = partner.first_name ? `${partner.first_name} ${partner.last_name || ""}` : partner.business_name;
-  const tier = partner.tier_level || "GOLD";
+  const tier = partner.tier_level || "BRONZE";
+  const cleared = Boolean(partner.cleared);
 
   const handlePrint = () => {
     window.print();
@@ -56,7 +59,7 @@ export function DigitalIdCard({ partner }: DigitalIdCardProps) {
               Official Repnexa Technician Identity Badge
             </h4>
             <p className="text-2xs text-slate-500">
-              Show this ID card to customers at doorstep or building security for instant entry approval.
+              Green ID page = entry allowed.
             </p>
           </div>
         </div>
@@ -105,8 +108,10 @@ export function DigitalIdCard({ partner }: DigitalIdCardProps) {
             {/* Top Lanyard Slot */}
             <div className="bg-slate-900 px-6 py-2 flex justify-between items-center text-white text-3xs font-mono uppercase tracking-wider">
               <span className="flex items-center space-x-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span className="text-emerald-400 font-bold">VERIFIED REPNEXA CREW</span>
+                <span className={`w-2 h-2 rounded-full ${cleared ? "bg-emerald-400" : "bg-rose-400"} animate-pulse`}></span>
+                <span className={`${cleared ? "text-emerald-400" : "text-rose-300"} font-bold`}>
+                  {cleared ? "CLEARED FOR DOORSTEP ENTRY" : "NOT CLEARED FOR ENTRY"}
+                </span>
               </span>
               <span>ID: {partner.partner_code}</span>
             </div>
@@ -169,25 +174,25 @@ export function DigitalIdCard({ partner }: DigitalIdCardProps) {
                 </div>
                 <div>
                   <span className="text-3xs text-slate-400 uppercase font-semibold block">Experience</span>
-                  <span className="font-semibold text-slate-900">{partner.experience_years || 5}+ Years Field Pro</span>
+                  <span className="font-semibold text-slate-900">
+                    {Number(partner.experience_years) > 0 ? `${partner.experience_years} years on file` : "Not listed"}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-3xs text-slate-400 uppercase font-semibold block">Validity</span>
-                  <span className="font-semibold text-emerald-700">2026 – 2027 (Active)</span>
+                  <span className="text-3xs text-slate-400 uppercase font-semibold block">Entry</span>
+                  <span className={`font-semibold ${cleared ? "text-emerald-700" : "text-rose-700"}`}>
+                    {cleared ? "Green ID = entry ok" : "Not valid for entry"}
+                  </span>
                 </div>
               </div>
 
               {/* Compliance Stamps */}
-              <div className="flex items-center justify-between text-3xs font-bold text-slate-600 border-t border-b border-slate-100 py-2">
-                <span className="flex items-center text-emerald-700">
-                  <span className="mr-1">✓</span> Govt Aadhaar
-                </span>
-                <span className="flex items-center text-emerald-700">
-                  <span className="mr-1">✓</span> Police Verified
-                </span>
-                <span className="flex items-center text-emerald-700">
-                  <span className="mr-1">✓</span> Skill Certified
-                </span>
+              <div className="text-3xs font-bold border-t border-b border-slate-100 py-2">
+                {cleared ? (
+                  <span className="text-emerald-700">4 checks passed. Match the public ID.</span>
+                ) : (
+                  <span className="text-rose-700">Not an entry pass until all 4 checks pass.</span>
+                )}
               </div>
 
               {/* QR Code Verification Section */}
@@ -195,7 +200,7 @@ export function DigitalIdCard({ partner }: DigitalIdCardProps) {
                 <div className="text-2xs space-y-1">
                   <span className="font-bold text-slate-900 block">Scan to Verify Authenticity</span>
                   <p className="text-3xs text-slate-500 leading-tight">
-                    Customers & Security: Scan QR code with any smartphone camera to view live Repnexa background verification.
+                    Scan. Green = ok. Red = stop.
                   </p>
                   <span className="text-3xs font-mono font-bold text-purple-700 block">
                     repnexa.com/verify/{partner.partner_code}
@@ -209,7 +214,7 @@ export function DigitalIdCard({ partner }: DigitalIdCardProps) {
 
             {/* Bottom Bar */}
             <div className="bg-slate-900 text-white text-center py-2 text-3xs font-semibold tracking-wider uppercase">
-              Official Property of Repnexa Services India Pvt Ltd • Toll-Free: 1800-419-7890
+              Official Property of Repnexa • Helpdesk: {SUPPORT_PHONE_DISPLAY}
             </div>
           </div>
         ) : (

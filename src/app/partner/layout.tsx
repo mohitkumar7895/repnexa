@@ -2,8 +2,8 @@ import { ReactNode } from "react";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { logoutUser } from "@/app/actions/auth-actions";
-import { db } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { getCurrentPartner } from "@/lib/partner";
+import { getPartnerProof, isDoorstepCleared, passedCheckCount } from "@/lib/verification";
 import { PortalShell, NavSection } from "@/components/portal/PortalShell";
 
 const PARTNER_NAV: NavSection[] = [
@@ -52,7 +52,7 @@ const PARTNER_NAV: NavSection[] = [
       {
         href: "/partner/id-card",
         label: "🪪 Digital Partner ID Card",
-        badge: { text: "Verified", colorClass: "bg-emerald-600 text-white" },
+        badge: { text: "Proof", colorClass: "bg-slate-800 text-white" },
       },
     ],
   },
@@ -66,42 +66,9 @@ export default async function PartnerLayout({ children }: { children: ReactNode 
     return <>{children}</>;
   }
 
-  let partner = {
-    business_name: "Sharma Cooling Solutions",
-    wallet_balance: 2500,
-    city_name: "New Delhi",
-    kyc_status: "approved",
-  };
-
-  try {
-    const session: any = await getSession();
-    if (session?.id) {
-      const [pRows]: any = await db.query(
-        `SELECT p.*, c.name as city_name 
-         FROM partners p 
-         LEFT JOIN cities c ON p.city_id = c.id 
-         WHERE p.user_id = ? 
-         LIMIT 1`,
-        [session.id]
-      );
-      if (pRows.length > 0) {
-        partner = pRows[0];
-      }
-    } else {
-      const [pRows]: any = await db.query(
-        `SELECT p.*, c.name as city_name 
-         FROM partners p 
-         LEFT JOIN cities c ON p.city_id = c.id 
-         WHERE p.partner_code = 'PTR-DEL-1001' 
-         LIMIT 1`
-      );
-      if (pRows.length > 0) {
-        partner = pRows[0];
-      }
-    }
-  } catch (e) {
-    // fallback
-  }
+  const partner = await getCurrentPartner();
+  const proof = partner.id ? await getPartnerProof(partner.id) : [];
+  const doorstepCleared = isDoorstepCleared(partner, passedCheckCount(proof));
 
   async function handleLogout() {
     "use server";
@@ -115,7 +82,7 @@ export default async function PartnerLayout({ children }: { children: ReactNode 
       navSections={PARTNER_NAV}
       userProfile={{
         name: partner.business_name,
-        subtitle: partner.kyc_status === "approved" ? "KYC Verified" : "KYC Pending",
+        subtitle: doorstepCleared ? "Cleared for doorstep entry" : `Proof ${passedCheckCount(proof)}/4`,
         avatarText: partner.business_name?.charAt(0) || "P",
         avatarColorClass: "bg-orange-600",
       }}

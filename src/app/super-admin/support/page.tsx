@@ -3,14 +3,25 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { revalidatePath } from "next/cache";
+import { ensurePortalTables } from "@/lib/portal-setup";
+import { stopDamageJob, suspendPartnerFromDamage } from "@/app/actions/field-actions";
 
 export default async function SuperAdminSupportPage() {
+  await ensurePortalTables();
   // Fetch tickets or complaints
   const [tickets]: any = await db.query(`
     SELECT t.*, u.email, u.first_name, u.phone
     FROM support_tickets t
     LEFT JOIN users u ON t.user_id = u.id
     ORDER BY t.id DESC
+  `);
+
+  const [damageReports]: any = await db.query(`
+    SELECT d.*, p.business_name, p.partner_code, l.lead_code
+    FROM damage_reports d
+    LEFT JOIN partners p ON p.id = d.partner_id
+    LEFT JOIN leads l ON l.id = d.lead_id
+    ORDER BY d.id DESC
   `);
 
   return (
@@ -20,6 +31,35 @@ export default async function SuperAdminSupportPage() {
         subtitle="Manage customer grievances, technician disputes, and resolution workflows"
         badge={`${tickets.length} Total Tickets`}
       />
+
+      <section className="rounded-2xl border border-rose-200 bg-white p-4 space-y-3">
+        <h2 className="text-sm font-black text-slate-900">Damage reports</h2>
+        {(damageReports || []).length === 0 ? (
+          <p className="text-xs text-slate-500">None yet.</p>
+        ) : (
+          (damageReports || []).map((report: any) => (
+            <article key={report.id} className="rounded-xl border border-slate-200 p-3 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                <p className="text-xs font-bold text-slate-900">{report.report_code} · {report.lead_code}</p>
+                <p className="text-2xs uppercase font-bold text-slate-500">{report.status}</p>
+              </div>
+              <p className="text-xs text-slate-700">{report.business_name || "No partner"} · {report.partner_code || "—"}</p>
+              <p className="text-xs text-slate-600">{report.description}</p>
+              {report.photo_url && (
+                <a href={report.photo_url} target="_blank" rel="noreferrer" className="text-2xs font-bold text-purple-700">Open photo</a>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <form action={async () => { "use server"; await stopDamageJob(report.id); }}>
+                  <button type="submit" className="px-2.5 py-1 rounded-lg bg-slate-900 text-white text-2xs font-bold">Stop job</button>
+                </form>
+                <form action={async () => { "use server"; await suspendPartnerFromDamage(report.id); }}>
+                  <button type="submit" className="px-2.5 py-1 rounded-lg bg-rose-700 text-white text-2xs font-bold">Suspend partner</button>
+                </form>
+              </div>
+            </article>
+          ))
+        )}
+      </section>
 
       {/* Quick Add Complaint / Ticket */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs">

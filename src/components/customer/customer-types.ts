@@ -14,9 +14,15 @@ export interface BookingRecord {
   preferred_date?: string;
   preferred_time?: string;
   lead_fee?: number;
+  coupon_code?: string;
+  discount_amount?: number;
   status: string;
   assigned_partner_id?: number;
   partner_name?: string;
+  partner_code?: string;
+  partner_kyc_status?: string;
+  partner_account_status?: string;
+  partner_passed_checks?: number;
   partner_phone?: string;
   partner_rating?: number;
   partner_total_jobs?: number;
@@ -26,6 +32,8 @@ export interface BookingRecord {
   before_photo_url?: string;
   after_photo_url?: string;
   final_amount?: number;
+  bill_requested?: number;
+  bill_items?: { name: string; qty: number; price: number }[];
   created_at: string;
   updated_at?: string;
 }

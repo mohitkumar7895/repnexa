@@ -2,19 +2,29 @@ import { db } from "@/lib/db";
 import { updateJobStatus, uploadJobPhotoProof, sendJobOtpToEmail } from "@/app/actions/portal-actions";
 import Image from "next/image";
 import { FileUpload } from "@/components/ui/FileUpload";
+import { getCurrentPartner } from "@/lib/partner";
+import { CompleteJobForm } from "@/components/partner/CompleteJobForm";
+import { JobBillDesk } from "@/components/partner/JobBillDesk";
+import { ensurePortalTables } from "@/lib/portal-setup";
 
 export default async function PartnerJobsPage() {
-  const [partnerRows]: any = await db.query("SELECT id FROM partners WHERE partner_code = 'PTR-DEL-1001' LIMIT 1");
-  const partnerId = partnerRows[0]?.id || 1;
+  const partner = await getCurrentPartner();
+  const partnerId = Number(partner.id) || 0;
+  await ensurePortalTables();
 
   const [jobs]: any = await db.query(`
-    SELECT j.*, l.lead_code, l.customer_name, l.customer_phone, l.customer_address, l.problem_description, s.title as service_title
+    SELECT j.*, l.lead_code, l.customer_name, l.customer_phone, l.customer_address, l.problem_description, l.coupon_code, l.discount_amount, s.title as service_title
     FROM jobs j
     LEFT JOIN leads l ON j.lead_id = l.id
     LEFT JOIN services s ON l.service_id = s.id
     WHERE j.partner_id = ?
     ORDER BY j.id DESC
   `, [partnerId]);
+
+  const [billRows]: any = await db.query(
+    "SELECT * FROM job_bill_items WHERE partner_id = ? ORDER BY id ASC",
+    [partnerId]
+  );
 
   return (
     <div className="space-y-6">
@@ -35,6 +45,8 @@ export default async function PartnerJobsPage() {
         ) : (
           jobs.map((job: any) => {
             const isCompleted = job.status === "COMPLETED";
+            const lines = (billRows || []).filter((line: any) => line.job_id === job.id);
+            const linesTotal = lines.reduce((sum: number, line: any) => sum + Number(line.qty) * Number(line.unit_price), 0);
 
             return (
               <div key={job.id} className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-5">
@@ -63,14 +75,10 @@ export default async function PartnerJobsPage() {
                     <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                       {job.problem_description}
                     </p>
-                    {job.completion_otp && !isCompleted && (
+                    {!isCompleted && (
                       <div className="text-xs bg-purple-50 text-purple-900 border border-purple-200 p-2.5 rounded-lg font-medium space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span>📧 Customer Email OTP:</span>
-                          <span className="font-mono font-bold text-purple-700 bg-white px-2 py-0.5 rounded border border-purple-200">{job.completion_otp}</span>
-                        </div>
-                        <p className="text-2xs text-slate-500">
-                          Ask customer for the verification code sent to their registered email upon arrival.
+                        <p className="text-2xs text-slate-600">
+                          Ask the customer for the code on their booking. Do not close the job without it.
                         </p>
                         <form action={async () => {
                           "use server";
@@ -165,7 +173,7 @@ export default async function PartnerJobsPage() {
                         <span className="text-2xs font-bold uppercase text-slate-600">2. Fixed & Tested Machine (After)</span>
                         {job.after_photo_url ? (
                           <span className="text-2xs text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                            ✓ Verified
+                            Photo saved
                           </span>
                         ) : (
                           <span className="text-2xs text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
@@ -254,32 +262,15 @@ export default async function PartnerJobsPage() {
                       )}
                     </div>
 
-                    {/* Completion Form with OTP */}
-                    <form action={async (formData: FormData) => {
-                      "use server";
-                      const otp = formData.get("otp") as string;
-                      const amount = Number(formData.get("amount")) || 499;
-                      await updateJobStatus(job.id, "COMPLETED", otp, amount);
-                    }} className="flex items-center space-x-2">
-                      <input 
-                        type="text" 
-                        name="otp" 
-                        placeholder="Email OTP" 
-                        required 
-                        className="w-28 text-xs p-1.5 border border-slate-300 rounded font-mono"
-                      />
-                      <input 
-                        type="number" 
-                        name="amount" 
-                        placeholder="Final Bill ₹" 
-                        defaultValue="699" 
-                        required 
-                        className="w-24 text-xs p-1.5 border border-slate-300 rounded font-mono"
-                      />
-                      <button type="submit" className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs cursor-pointer">
-                        ✓ Complete Job
-                      </button>
-                    </form>
+                    <JobBillDesk jobId={job.id} lines={lines} billRequested={Number(job.bill_requested) === 1} />
+
+                    <CompleteJobForm
+                      jobId={job.id}
+                      suggestedAmount={Number(job.estimate_amount || job.final_amount || 0)}
+                      couponCode={job.coupon_code}
+                      discountAmount={Number(job.discount_amount || 0)}
+                      lockedAmount={linesTotal}
+                    />
                   </div>
                 ) : (
                   <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">

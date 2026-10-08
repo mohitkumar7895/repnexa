@@ -5,6 +5,8 @@ import Link from "next/link";
 import { sendJobOtpToEmail } from "@/app/actions/portal-actions";
 import { BookingRecord } from "./customer-types";
 import { CustomerBookingCard } from "./CustomerBookingCard";
+import { StatCard } from "@/components/ui/StatCard";
+import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from "@/lib/contact";
 
 export type { BookingRecord };
 
@@ -54,50 +56,45 @@ export default function CustomerDashboardClient({
   const activeCount = requests.filter((r) => !["COMPLETED", "CANCELLED"].includes(r.status)).length;
   const completedCount = requests.filter((r) => r.status === "COMPLETED").length;
   const cancelledCount = requests.filter((r) => r.status === "CANCELLED").length;
+  const ratings = requests
+    .map((req) => Number(req.partner_rating))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const satisfaction = ratings.length
+    ? (ratings.reduce((sum, value) => sum + value, 0) / ratings.length).toFixed(1)
+    : null;
 
   return (
     <div className="space-y-8">
-      {/* KPI Stats Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-3xs font-bold uppercase tracking-wider text-slate-400">Total Bookings</span>
-            <span className="w-7 h-7 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xs">📋</span>
-          </div>
-          <div className="text-2xl font-black text-slate-900 mt-1">{requests.length}</div>
-          <div className="text-3xs text-slate-400 mt-0.5">Tracked orders</div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-3xs font-bold uppercase tracking-wider text-amber-600">Active</span>
-            <span className="w-7 h-7 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xs">🚗</span>
-          </div>
-          <div className="text-2xl font-black text-slate-900 mt-1">{activeCount}</div>
-          <div className="text-3xs text-slate-400 mt-0.5">Technicians in action</div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-3xs font-bold uppercase tracking-wider text-emerald-600">Completed</span>
-            <span className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-bold">✓</span>
-          </div>
-          <div className="text-2xl font-black text-slate-900 mt-1">{completedCount}</div>
-          <div className="text-3xs text-slate-400 mt-0.5">Verified & tested</div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-3xs font-bold uppercase tracking-wider text-indigo-600">Satisfaction</span>
-            <span className="w-7 h-7 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs">⭐</span>
-          </div>
-          <div className="text-2xl font-black text-slate-900 mt-1">4.9<span className="text-xs text-slate-400 font-normal">/5</span></div>
-          <div className="text-3xs text-slate-400 mt-0.5">Verified partner rating</div>
-        </div>
+        <StatCard label="Total Bookings" value={requests.length} subtext="Tracked orders" badge="All" badgeColor="purple" />
+        <StatCard
+          label="Active"
+          value={activeCount}
+          subtext="Technicians in action"
+          badge={activeCount > 0 ? "Live" : "Clear"}
+          badgeColor="orange"
+          valueColor="text-amber-700 dark:text-amber-300"
+        />
+        <StatCard
+          label="Completed"
+          value={completedCount}
+          subtext="Verified and tested"
+          badge="Done"
+          badgeColor="emerald"
+          valueColor="text-emerald-700 dark:text-emerald-400"
+        />
+        <StatCard
+          label="Satisfaction"
+          value={satisfaction ? `${satisfaction}/5` : "—"}
+          subtext={satisfaction ? "Average partner rating" : "No rated visits yet"}
+          badge="Reviews"
+          badgeColor="slate"
+          valueColor="text-indigo-700 dark:text-indigo-300"
+        />
       </div>
 
       {/* Tabs & Search Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-2.5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-2 sm:p-2.5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
         {/* Tab Buttons */}
         <div className="flex items-center space-x-1 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           {[
@@ -110,10 +107,10 @@ export default function CustomerDashboardClient({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id as any)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap flex items-center space-x-1.5 ${
                 activeTab === tab.id
-                  ? "bg-slate-900 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  ? "bg-slate-900 text-white shadow-xs dark:bg-white dark:text-slate-900"
+                  : "text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800"
               }`}
             >
               <span>{tab.label}</span>
@@ -138,7 +135,7 @@ export default function CustomerDashboardClient({
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             placeholder="Filter bookings..."
-            className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-purple-600 transition-all"
+            className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 focus:bg-white focus:outline-none focus:border-purple-600 transition-all"
           />
           {localSearch && (
             <button
@@ -165,7 +162,7 @@ export default function CustomerDashboardClient({
                 ? `No bookings match your filter "${localSearch}". Try clearing the filter.`
                 : initialQuery
                 ? `No bookings found for "${initialQuery}". Check your phone number or lead code.`
-                : "You don't have any bookings in this section yet."}
+                : "Enter your mobile number or booking code above to see only your visits."}
             </p>
             <Link
               href="/book"
@@ -197,15 +194,15 @@ export default function CustomerDashboardClient({
             </span>
             <h3 className="text-lg sm:text-xl font-black mt-2">Need Immediate Support or Reschedule?</h3>
             <p className="text-xs text-slate-300 max-w-lg">
-              Our 24x7 customer support desk is available to assist you with doorstep service updates, technician arrival, or priority reschedule requests.
+              Call helpdesk. Keep your booking code.
             </p>
           </div>
           <div className="flex items-center space-x-3 flex-shrink-0">
             <a
-              href="tel:18007376392"
+              href={`tel:${SUPPORT_PHONE_TEL}`}
               className="px-5 py-2.5 rounded-2xl bg-white text-slate-950 font-black text-xs shadow-md hover:bg-slate-100 transition-colors"
             >
-              📞 1800-REPNEXA
+              📞 {SUPPORT_PHONE_DISPLAY}
             </a>
             <Link
               href="/book"

@@ -92,18 +92,10 @@ export async function sendJobOtpEmail({
     </html>
   `;
 
-  // Always log to console for development visibility
-  console.log("--------------------------------------------------");
-  console.log(`📧 [EMAIL OTP DISPATCH] To: ${to}`);
-  console.log(`🔑 OTP Code: ${otp} | Job: #${jobCode} | Customer: ${customerName}`);
-  console.log("--------------------------------------------------");
-
   if (!user || !pass) {
-    console.log("⚠️ SMTP_USER or SMTP_PASS not set in .env. Email logged above (Dev Mode).");
     return {
-      success: true,
-      mode: "dev_logged",
-      message: `OTP generated & logged for ${to}: [${otp}]`,
+      success: false,
+      error: "Email is not set up. The customer can still open the code on their booking.",
     };
   }
 

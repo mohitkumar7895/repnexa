@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { SUPPORT_EMAIL, SUPPORT_PHONE_DISPLAY } from "@/lib/contact";
 
 interface InvoiceData {
   leadCode: string;
@@ -15,14 +16,15 @@ interface InvoiceData {
   partnerPhone?: string;
   completedDate: string;
   finalAmount?: number;
+  lineItems?: { name: string; qty: number; price: number }[];
 }
 
 export default function WarrantyInvoiceModal({ data }: { data: InvoiceData }) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const amount = Number(data.finalAmount) > 0 ? Number(data.finalAmount) : 499;
-  const baseAmount = Math.round((amount / 1.18) * 100) / 100;
-  const gstAmount = Math.round((amount - baseAmount) * 100) / 100;
+  const lines = data.lineItems || [];
+  const lineTotal = lines.reduce((sum, line) => sum + Number(line.qty) * Number(line.price), 0);
+  const amount = lineTotal > 0 ? lineTotal : (Number(data.finalAmount) > 0 ? Number(data.finalAmount) : 0);
 
   const completionDateObj = new Date(data.completedDate || Date.now());
 
@@ -41,7 +43,7 @@ export default function WarrantyInvoiceModal({ data }: { data: InvoiceData }) {
         className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-2xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer"
       >
         <span>📄</span>
-        <span>View GST Invoice & Receipt</span>
+        <span>Open bill</span>
       </button>
 
       {isOpen && (
@@ -81,8 +83,7 @@ export default function WarrantyInvoiceModal({ data }: { data: InvoiceData }) {
                 </div>
                 <div className="sm:text-right">
                   <div className="text-3xs font-bold uppercase tracking-wider text-slate-400">Repnexa Care Network</div>
-                  <div className="font-semibold text-slate-900 mt-0.5">GSTIN: 07AAACR1234F1Z5</div>
-                  <div className="text-3xs text-slate-500 mt-1">CIN: U72900DL2024PTC123456</div>
+                  <div className="font-semibold text-slate-900 mt-0.5">Doorstep visit bill</div>
                 </div>
               </div>
 
@@ -101,14 +102,14 @@ export default function WarrantyInvoiceModal({ data }: { data: InvoiceData }) {
 
                 <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
                   <div className="text-3xs font-bold uppercase tracking-wider text-emerald-700 mb-1">
-                    Certified Service Partner
+                    Technician
                   </div>
                   <div className="font-bold text-slate-900">{data.partnerName}</div>
                   {data.partnerPhone && (
                     <div className="text-slate-600 font-mono mt-0.5">{data.partnerPhone}</div>
                   )}
                   <div className="text-2xs text-slate-500 mt-1">
-                    Verified Expert • Police & Skill Cleared
+                    Check the public ID first
                   </div>
                 </div>
               </div>
@@ -120,29 +121,23 @@ export default function WarrantyInvoiceModal({ data }: { data: InvoiceData }) {
                   <span>Amount (INR)</span>
                 </div>
                 <div className="p-4 space-y-3">
-                  <div className="flex justify-between items-start text-xs">
-                    <div>
-                      <div className="font-bold text-slate-900">
-                        {data.serviceTitle} {data.brandName && `• ${data.brandName}`}
+                  {lines.length > 0 ? (
+                    lines.map((line) => (
+                      <div key={`${line.name}-${line.price}`} className="flex justify-between text-xs">
+                        <span className="font-semibold text-slate-900">{line.name} × {line.qty}</span>
+                        <span className="font-mono font-bold">₹{(Number(line.qty) * Number(line.price)).toFixed(2)}</span>
                       </div>
-                      <div className="text-2xs text-slate-500 mt-0.5">
-                        Professional doorstep diagnostic, repair & testing service
-                      </div>
+                    ))
+                  ) : (
+                    <div className="flex justify-between items-start text-xs">
+                      <div className="font-bold text-slate-900">{data.serviceTitle}</div>
+                      <div className="font-mono font-bold text-slate-900">₹{amount.toFixed(2)}</div>
                     </div>
-                    <div className="font-mono font-bold text-slate-900">₹{baseAmount.toFixed(2)}</div>
-                  </div>
+                  )}
 
                   <div className="border-t border-slate-100 pt-3 space-y-1.5 text-2xs text-slate-600">
-                    <div className="flex justify-between">
-                      <span>Taxable Value</span>
-                      <span className="font-mono">₹{baseAmount.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Integrated GST (18%)</span>
-                      <span className="font-mono">₹{gstAmount.toFixed(2)}</span>
-                    </div>
                     <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
-                      <span>Total Paid (Incl. Taxes)</span>
+                      <span>Total</span>
                       <span className="font-mono text-emerald-700">₹{amount.toFixed(2)}</span>
                     </div>
                   </div>
@@ -157,11 +152,11 @@ export default function WarrantyInvoiceModal({ data }: { data: InvoiceData }) {
                 <div className="flex-1">
                   <div className="flex items-center space-x-2">
                     <span className="text-xs font-black uppercase tracking-wider text-slate-900">
-                      Official Service Completion Receipt
+                      Visit bill
                     </span>
                   </div>
                   <p className="text-2xs text-slate-600 mt-0.5 leading-relaxed">
-                    This service request has been successfully completed and tested at the doorstep with customer OTP confirmation on {formatDate(completionDateObj)}.
+                    Parts listed on {formatDate(completionDateObj)}.
                   </p>
                 </div>
               </div>
@@ -169,7 +164,7 @@ export default function WarrantyInvoiceModal({ data }: { data: InvoiceData }) {
               {/* Footer notes */}
               <div className="text-center text-3xs text-slate-400 space-y-0.5">
                 <p>This is a computer-generated invoice and does not require a physical signature.</p>
-                <p>For customer support or inquiries, call 1800-REPNEXA or email support@repnexa.com</p>
+                <p>For support, call {SUPPORT_PHONE_DISPLAY} or email {SUPPORT_EMAIL}</p>
               </div>
             </div>
 

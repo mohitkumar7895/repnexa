@@ -3,11 +3,11 @@ import { requestPartnerWithdrawal } from "@/app/actions/portal-actions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { getCurrentPartner } from "@/lib/partner";
 import Link from "next/link";
 
 export default async function PartnerWithdrawalsPage() {
-  const [partnerRows]: any = await db.query("SELECT id, wallet_balance, partner_code, business_name FROM partners WHERE partner_code = 'PTR-DEL-1001' LIMIT 1");
-  const partner = partnerRows[0] || { id: 1, wallet_balance: 2500, partner_code: 'PTR-DEL-1001' };
+  const partner = await getCurrentPartner();
 
   const [withdrawals]: any = await db.query(
     "SELECT * FROM withdrawals WHERE partner_id = ? ORDER BY id DESC",

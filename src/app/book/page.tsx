@@ -6,8 +6,9 @@ import { redirect } from "next/navigation";
 
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
-export default async function BookingPage({ searchParams }: { searchParams?: Promise<{ category?: string; service?: string }> }) {
+export default async function BookingPage({ searchParams }: { searchParams?: Promise<{ category?: string; service?: string; error?: string }> }) {
   const sp = searchParams ? await searchParams : {};
+  const todayIndia = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
   // Fetch dynamic categories, services, brands, and cities from MySQL
   const [categories]: any = await db.query("SELECT * FROM categories WHERE status = 'Active' ORDER BY id ASC");
   const [services]: any = await db.query("SELECT id, category_id, title, selling_price, warranty_days FROM services ORDER BY title ASC");
@@ -21,29 +22,24 @@ export default async function BookingPage({ searchParams }: { searchParams?: Pro
     if (res.success && res.leadCode) {
       redirect(`/customer/dashboard?leadCode=${res.leadCode}`);
     }
+    redirect(`/book?error=${encodeURIComponent(res.error || "Booking could not be saved.")}`);
   }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors">
       {/* Top Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center">
-            <div className="relative w-40 h-10 flex-shrink-0">
-              <Image 
-                src="/logo.png" 
-                alt="Repnexa" 
-                fill 
-                className="object-contain object-left" 
-                priority
-              />
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2">
+          <Link href="/" className="flex items-center min-w-0">
+            <div className="relative w-28 sm:w-40 h-9 sm:h-10 shrink-0">
+              <Image src="/logo.png" alt="Repnexa" fill className="object-contain object-left" priority sizes="160px" />
             </div>
           </Link>
-          <div className="flex items-center space-x-3 text-sm font-medium">
-            <Link href="/" className="text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white">Home</Link>
+          <div className="flex items-center gap-1.5 sm:gap-3 text-xs font-semibold">
+            <Link href="/" className="hidden sm:inline text-slate-600 dark:text-slate-300">Home</Link>
             <ThemeToggle />
-            <Link href="/become-partner" className="text-purple-600 dark:text-purple-400 hover:text-purple-800 font-semibold">Join as Partner</Link>
-            <Link href="/customer/dashboard" className="px-3 py-1.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700">My Bookings</Link>
+            <Link href="/become-partner" className="hidden md:inline text-purple-600">Partner</Link>
+            <Link href="/customer/dashboard" className="px-2.5 py-1.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200">Track</Link>
           </div>
         </div>
       </header>
@@ -56,14 +52,17 @@ export default async function BookingPage({ searchParams }: { searchParams?: Pro
             <div className="inline-block px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-semibold uppercase tracking-wider mb-2">
               Verified Appliance & Electronic Repair
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Book Doorstep Expert Service</h1>
-            <p className="mt-2 text-slate-300 text-sm max-w-xl">
-              Select your appliance, problem details, and preferred timing. We automatically match you with top-rated, police-verified technicians in your area.
-            </p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Book a visit</h1>
+            <p className="mt-2 text-slate-300 text-sm">Cleared technician. Your city only.</p>
           </div>
 
           {/* Booking Form */}
           <form action={handleBooking} className="p-6 sm:p-8 space-y-8">
+            {sp?.error && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">
+                {sp.error}
+              </div>
+            )}
             {/* Step 1: Select Service */}
             <div>
               <div className="flex items-center space-x-2 pb-3 border-b border-slate-200">
@@ -80,7 +79,8 @@ export default async function BookingPage({ searchParams }: { searchParams?: Pro
                     list="service-options"
                     required
                     defaultValue={sp?.category || sp?.service || ""}
-                    placeholder="Type service (e.g. Split AC Repair, Fridge Cooling Fix, TV Wall Mounting)"
+                    placeholder="Pick a service from the suggestions"
+                    autoComplete="off"
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-purple-600 focus:outline-none"
                   />
                   <datalist id="service-options">
@@ -118,10 +118,11 @@ export default async function BookingPage({ searchParams }: { searchParams?: Pro
 
               <div className="mt-4">
                 <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">What issue are you facing? *</label>
-                <textarea 
+                  <textarea 
                   name="problem" 
                   rows={3} 
                   required
+                  minLength={12}
                   placeholder="e.g. AC is not cooling properly, making buzzing noise and water is dripping from indoor unit..."
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-purple-600 focus:outline-none"
                 ></textarea>
@@ -142,7 +143,7 @@ export default async function BookingPage({ searchParams }: { searchParams?: Pro
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Mobile Number *</label>
-                  <input type="tel" name="customerPhone" required placeholder="Enter 10-digit mobile number" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-purple-600 focus:outline-none" />
+                  <input type="tel" name="customerPhone" required inputMode="numeric" pattern="[6-9][0-9]{9}" title="10-digit mobile number starting with 6, 7, 8, or 9" placeholder="Enter 10-digit mobile number" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-purple-600 focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Email Address (For Verification & Service OTP) *</label>
@@ -155,7 +156,7 @@ export default async function BookingPage({ searchParams }: { searchParams?: Pro
                     name="cityName"
                     list="city-options"
                     required
-                    placeholder="Enter city (e.g. New Delhi, Noida, Mumbai)"
+                    placeholder="Pick a city from the suggestions"
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-purple-600 focus:outline-none"
                   />
                   <datalist id="city-options">
@@ -166,15 +167,19 @@ export default async function BookingPage({ searchParams }: { searchParams?: Pro
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Pincode *</label>
-                  <input type="text" name="pincode" required placeholder="Enter 6-digit pincode" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-purple-600 focus:outline-none" />
+                  <input type="text" name="pincode" required inputMode="numeric" pattern="[1-9][0-9]{5}" title="6-digit pincode" placeholder="Enter 6-digit pincode" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-purple-600 focus:outline-none" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Complete Doorstep Address *</label>
-                  <textarea name="address" rows={2} required placeholder="Flat/House No, Building, Street, Landmark" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-purple-600 focus:outline-none"></textarea>
+                  <textarea name="address" rows={2} required minLength={10} placeholder="Flat/House No, Building, Street, Landmark" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-purple-600 focus:outline-none"></textarea>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Coupon code</label>
+                  <input type="text" name="couponCode" placeholder="Optional, for example FESTIVE20" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono uppercase focus:border-purple-600 focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Preferred Date *</label>
-                  <input type="date" name="preferredDate" required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-purple-600 focus:outline-none" />
+                  <input type="date" name="preferredDate" required min={todayIndia} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-purple-600 focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Preferred Time Slot *</label>
@@ -191,7 +196,7 @@ export default async function BookingPage({ searchParams }: { searchParams?: Pro
             {/* Bottom Actions */}
             <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-xs text-slate-500">
-                🛡️ Verified Technicians • Certified Experts • Doorstep Support
+                🛡️ Cleared technicians only • Public ID check • Doorstep support
               </div>
               <button 
                 type="submit" 

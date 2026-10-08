@@ -26,6 +26,7 @@ export interface AuthLoginFormProps {
   subtitle?: string;
   defaultRedirect?: string;
   demoCredentials?: DemoCredentials | null;
+  altDemo?: DemoCredentials | null;
   accentColor?: AccentColor;
   registerLink?: RegisterLinkConfig;
   emailLabel?: string;
@@ -147,6 +148,7 @@ function LoginFormInternal({
   subtitle,
   defaultRedirect,
   demoCredentials,
+  altDemo,
   accentColor,
   registerLink,
   emailLabel,
@@ -175,14 +177,6 @@ function LoginFormInternal({
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
-
-  const handleFillDemo = () => {
-    if (resolvedDemo) {
-      setEmail(resolvedDemo.email);
-      setPassword(resolvedDemo.password);
-      setError("");
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -241,16 +235,24 @@ function LoginFormInternal({
         {/* Card */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-7 shadow-lg transition-colors">
           {/* Quick Demo Fill Button */}
-          {resolvedDemo && (
-            <div className="mb-4 flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs">
-              <span className="text-slate-600 dark:text-slate-400 font-mono text-2xs truncate">{resolvedDemo.email}</span>
-              <button
-                type="button"
-                onClick={handleFillDemo}
-                className={`text-2xs font-semibold px-2 py-1 rounded ${colors.demoBtn} text-white cursor-pointer transition-colors shrink-0`}
-              >
-                Demo Fill
-              </button>
+          {(resolvedDemo || altDemo) && (
+            <div className="mb-4 space-y-2">
+              {[resolvedDemo, altDemo].filter(Boolean).map((demo) => (
+                <div key={demo!.email} className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs">
+                  <span className="text-slate-600 dark:text-slate-400 font-mono text-2xs truncate">{demo!.email}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail(demo!.email);
+                      setPassword(demo!.password);
+                      setError("");
+                    }}
+                    className={`text-2xs font-semibold px-2 py-1 rounded ${colors.demoBtn} text-white shrink-0`}
+                  >
+                    Use demo
+                  </button>
+                </div>
+              ))}
             </div>
           )}
 

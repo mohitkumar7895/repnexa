@@ -32,21 +32,7 @@ export async function createRazorpayOrder({
 
   const client = getRazorpayClient();
   if (!client) {
-    // Return mock order if credentials not yet configured by user
-    return {
-      id: `order_mock_${Date.now()}`,
-      entity: "order",
-      amount: amountInPaise,
-      amount_paid: 0,
-      amount_due: amountInPaise,
-      currency: "INR",
-      receipt,
-      status: "created",
-      attempts: 0,
-      notes,
-      created_at: Math.floor(Date.now() / 1000),
-      isMock: true,
-    };
+    throw new Error("Razorpay is not set up. Add the live keys before taking a payment.");
   }
 
   const order = await client.orders.create({
@@ -68,9 +54,8 @@ export function verifyRazorpaySignature({
   paymentId: string;
   signature: string;
 }): boolean {
-  if (!isRazorpayConfigured) {
-    // If running in development/mock mode without keys
-    return true;
+  if (!isRazorpayConfigured || !signature) {
+    return false;
   }
 
   try {

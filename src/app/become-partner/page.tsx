@@ -44,18 +44,16 @@ export default async function BecomePartnerPage({
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 py-10 px-4 sm:px-6 lg:px-8 transition-colors">
       <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
         {/* Banner */}
-        <div className="bg-gradient-to-r from-orange-600 via-pink-600 to-purple-700 px-6 py-8 text-white">
-          <div className="flex justify-between items-center">
+        <div className="bg-gradient-to-r from-orange-600 via-pink-600 to-purple-700 px-4 sm:px-6 py-6 sm:py-8 text-white">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <span className="text-xs font-bold tracking-wider uppercase px-2.5 py-1 rounded-full bg-white/20">
-                Partner Network
+                Partner
               </span>
-              <h1 className="text-2xl sm:text-3xl font-extrabold mt-2">Join Repnexa as Service Partner</h1>
-              <p className="mt-1 text-sm text-orange-100">
-                Get high-paying verified customer leads daily in your city with low commissions & transparent wallet system.
-              </p>
+              <h1 className="text-2xl sm:text-3xl font-extrabold mt-2">Join as a partner</h1>
+              <p className="mt-1 text-sm text-orange-100">ID first. Leads after 4 checks.</p>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center gap-2 shrink-0">
               <ThemeToggle />
               <Link href="/" className="hidden sm:inline-block text-xs bg-white text-slate-800 font-bold px-4 py-2 rounded-lg hover:bg-slate-100">
                 Back to Home

@@ -4,6 +4,10 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { sendJobOtpEmail } from "@/lib/email";
 import bcrypt from "bcrypt";
+import { ensurePortalTables } from "@/lib/portal-setup";
+import { getPartnerTier } from "@/lib/partner";
+import { getSession } from "@/lib/auth";
+import { DOORSTEP_CHECKS, getPartnerProof, isDoorstepCleared, passedCheckCount } from "@/lib/verification";
 
 // ==========================================
 // HELPER: RESOLVE OR CREATE CITY (MANUAL ENTRY)
@@ -42,61 +46,112 @@ export async function getOrCreateCityId(cityNameOrId?: string | number | null): 
   return insertRes.insertId;
 }
 
+async function findCityId(cityName: string) {
+  const cleanName = cityName.trim();
+  if (!cleanName) return null;
+  const [rows]: any = await db.query(
+    "SELECT id FROM cities WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1",
+    [cleanName]
+  );
+  return rows?.[0]?.id ? Number(rows[0].id) : null;
+}
+
+function parsePincodes(raw: string) {
+  const pins = [...new Set(raw.split(/[\s,]+/).map((pin) => pin.replace(/\D/g, "")).filter(Boolean))];
+  if (!pins.length || pins.some((pin) => !/^[1-9]\d{5}$/.test(pin))) {
+    return { error: "Add the 6-digit pincodes you cover.", pins: [] as string[] };
+  }
+  return { error: null, pins };
+}
+
 // ==========================================
 // 1. CUSTOMER SERVICE BOOKING & LEAD CREATION
 // ==========================================
 export async function createServiceRequest(formData: FormData) {
   try {
-    const customerName = formData.get("customerName") as string;
-    const customerPhone = formData.get("customerPhone") as string;
-    const customerEmail = (formData.get("customerEmail") as string) || `${customerPhone}@repnexa.customer`;
-    const categoryId = Number(formData.get("categoryId")) || 1;
+    const customerName = String(formData.get("customerName") || "").trim();
+    const customerPhone = String(formData.get("customerPhone") || "").replace(/\D/g, "").slice(-10);
+    const customerEmail = String(formData.get("customerEmail") || "").trim().toLowerCase();
     let serviceId = Number(formData.get("serviceId"));
     const serviceName = ((formData.get("serviceName") as string) || (formData.get("serviceType") as string) || "").trim();
-    const brandName = ((formData.get("brandName") as string) || "Generic").trim();
-    const rawCity = (formData.get("cityName") as string) || (formData.get("cityId") as string) || "New Delhi";
-    const cityId = await getOrCreateCityId(rawCity);
-    const pincode = formData.get("pincode") as string || "110001";
-    const address = formData.get("address") as string;
-    const problem = formData.get("problem") as string;
-    const preferredDate = formData.get("preferredDate") as string || new Date().toISOString().split("T")[0];
-    const preferredTime = formData.get("preferredTime") as string || "Flexible Slot";
+    const brandName = String(formData.get("brandName") || "").trim();
+    const rawCity = String((formData.get("cityName") as string) || (formData.get("cityId") as string) || "").trim();
+    const pincode = String(formData.get("pincode") || "").replace(/\D/g, "");
+    const address = String(formData.get("address") || "").trim();
+    const problem = String(formData.get("problem") || "").trim();
+    const preferredDate = String(formData.get("preferredDate") || "").trim();
+    const preferredTime = String(formData.get("preferredTime") || "").trim();
+    const todayIndia = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
 
-    // If service was entered manually as text, resolve or register serviceId
+    if (customerName.length < 2) {
+      return { success: false, error: "Enter the full name of the person at the address." };
+    }
+    if (!/^[6-9]\d{9}$/.test(customerPhone)) {
+      return { success: false, error: "Enter a 10-digit Indian mobile number starting with 6, 7, 8, or 9." };
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+      return { success: false, error: "Enter a working email. The completion OTP can be sent there." };
+    }
+    if (problem.length < 12) {
+      return { success: false, error: "Describe the appliance problem in a sentence so the technician arrives prepared." };
+    }
+    if (address.length < 10) {
+      return { success: false, error: "Enter the full doorstep address, including house number and area." };
+    }
+    if (!/^[1-9]\d{5}$/.test(pincode)) {
+      return { success: false, error: "Enter a 6-digit pincode." };
+    }
+    if (!preferredDate || preferredDate < todayIndia) {
+      return { success: false, error: "Choose today or a later visit date." };
+    }
+    if (!preferredTime) {
+      return { success: false, error: "Choose a visit time slot." };
+    }
+    if (!brandName) {
+      return { success: false, error: "Enter the appliance brand." };
+    }
+
+    const [cityRows]: any = await db.query(
+      "SELECT id, name FROM cities WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1",
+      [rawCity]
+    );
+    if (!cityRows?.length) {
+      return { success: false, error: "Choose a city from the suggestions. A typed city that is not on the list cannot be assigned a technician." };
+    }
+    const cityId = cityRows[0].id;
+
     if (!serviceId && serviceName) {
       const [existingSvc]: any = await db.query(
         "SELECT id FROM services WHERE LOWER(title) = LOWER(?) LIMIT 1",
         [serviceName]
       );
-      if (existingSvc && existingSvc.length > 0) {
-        serviceId = existingSvc[0].id;
-      } else {
-        const [matchSvc]: any = await db.query(
-          "SELECT id FROM services WHERE title LIKE ? LIMIT 1",
-          [`%${serviceName}%`]
-        );
-        if (matchSvc && matchSvc.length > 0) {
-          serviceId = matchSvc[0].id;
-        } else {
-          const [inserted]: any = await db.query(
-            "INSERT INTO services (category_id, title, original_price, selling_price, warranty_days, short_description) VALUES (?, ?, 499, 299, 0, ?)",
-            [categoryId, serviceName, `${serviceName} repair & doorstep service`]
-          );
-          serviceId = inserted.insertId;
-        }
-      }
+      if (existingSvc?.length) serviceId = existingSvc[0].id;
     }
 
-    if (!customerName || !customerPhone || !serviceId || !address) {
-      return { success: false, error: "Please fill all required booking details." };
+    if (!serviceId) {
+      return { success: false, error: "Choose a service from the suggestions so the visit has the right price and warranty." };
     }
 
     // 1. Find or create user
-    const [existingUsers]: any = await db.query("SELECT id FROM users WHERE email = ? OR phone = ?", [customerEmail, customerPhone]);
+    const [existingUsers]: any = await db.query(
+      "SELECT id, email, phone FROM users WHERE phone IN (?, ?, ?) OR email = ? LIMIT 5",
+      [customerPhone, `+91${customerPhone}`, `91${customerPhone}`, customerEmail]
+    );
+    const phoneOwner = (existingUsers || []).find((user: any) => {
+      const digits = String(user.phone || "").replace(/\D/g, "").slice(-10);
+      return digits === customerPhone;
+    });
+    const emailOwner = (existingUsers || []).find((user: any) => String(user.email || "").toLowerCase() === customerEmail);
+    if (phoneOwner && emailOwner && phoneOwner.id !== emailOwner.id) {
+      return { success: false, error: "This mobile number and email are on different accounts. Use the same pair from your earlier booking." };
+    }
+    if (!phoneOwner && emailOwner) {
+      return { success: false, error: "This email is already used with another mobile number. Use that number, or a different email." };
+    }
     let userId: number;
 
-    if (existingUsers.length > 0) {
-      userId = existingUsers[0].id;
+    if (phoneOwner) {
+      userId = phoneOwner.id;
     } else {
       const uid = `usr_cust_${Date.now()}`;
       const [uRes]: any = await db.query(
@@ -118,39 +173,85 @@ export async function createServiceRequest(formData: FormData) {
       customerId = cRes.insertId;
     }
 
-    // 3. Get Service Fee details
-    const [svcRow]: any = await db.query("SELECT selling_price FROM services WHERE id = ?", [serviceId]);
-    const leadFee = 50.00;
+    await ensurePortalTables();
+
+    const couponCode = ((formData.get("couponCode") as string) || "").trim().toUpperCase();
+    let discountAmount = 0;
+    let svcRow: any[] = [];
+    try {
+      const [rows]: any = await db.query("SELECT selling_price, lead_fee FROM services WHERE id = ?", [serviceId]);
+      svcRow = rows || [];
+    } catch {
+      const [rows]: any = await db.query("SELECT selling_price FROM services WHERE id = ?", [serviceId]);
+      svcRow = rows || [];
+    }
+    if (!svcRow?.length) {
+      return { success: false, error: "That service is not on the catalogue. Pick one from the suggestions." };
+    }
+    const servicePrice = Number(svcRow?.[0]?.selling_price || 0);
+
+    if (couponCode) {
+      const [couponRows]: any = await db.query(
+        "SELECT * FROM coupons WHERE UPPER(code) = ? AND status = 'active' LIMIT 1",
+        [couponCode]
+      );
+      if (!couponRows?.length) {
+        return { success: false, error: `Coupon ${couponCode} is not active.` };
+      }
+      const coupon = couponRows[0];
+      const minOrder = Number(coupon.min_order_amount || 0);
+      if (servicePrice > 0 && servicePrice < minOrder) {
+        return { success: false, error: `Coupon ${couponCode} needs a service of at least ₹${minOrder}.` };
+      }
+      const basis = servicePrice || minOrder || Number(coupon.discount_value);
+      discountAmount = coupon.discount_type === "PERCENTAGE"
+        ? (basis * Number(coupon.discount_value)) / 100
+        : Number(coupon.discount_value);
+      const cap = Number(coupon.max_discount_amount || 0);
+      if (cap > 0) discountAmount = Math.min(discountAmount, cap);
+      discountAmount = Math.max(0, Math.round(discountAmount));
+    }
+
+    let leadFee = Number(svcRow?.[0]?.lead_fee || 0);
+    if (!leadFee) {
+      const [feeRows]: any = await db.query(
+        "SELECT setting_value FROM system_settings WHERE setting_key = 'default_lead_fee' LIMIT 1"
+      );
+      leadFee = Number(feeRows?.[0]?.setting_value || 50);
+    }
 
     // 4. Generate Lead
     const leadCode = `LEAD-${Date.now().toString().slice(-6)}`;
     const [leadRes]: any = await db.query(
-      `INSERT INTO leads (lead_code, customer_id, service_id, brand_name, city_id, pincode, customer_name, customer_phone, customer_address, problem_description, preferred_date, preferred_time, lead_fee, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW')`,
-      [leadCode, customerId, serviceId, brandName, cityId, pincode, customerName, customerPhone, address, problem, preferredDate, preferredTime, leadFee]
+      `INSERT INTO leads (lead_code, customer_id, service_id, brand_name, city_id, pincode, customer_name, customer_phone, customer_address, problem_description, preferred_date, preferred_time, lead_fee, coupon_code, discount_amount, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW')`,
+      [leadCode, customerId, serviceId, brandName, cityId, pincode, customerName, customerPhone, address, problem, preferredDate, preferredTime, leadFee, couponCode || null, discountAmount]
     );
 
     const leadId = leadRes.insertId;
 
     // 5. Automatic Partner Matching: Find nearby verified partners
+    const clearedPartnerSql = `
+      p.kyc_status = 'approved'
+      AND p.status = 'active'
+      AND p.wallet_balance >= ?
+      AND IFNULL(p.accepting_leads, 1) = 1
+      AND (
+        SELECT COUNT(*) FROM partner_verification_checks pvc
+        WHERE pvc.partner_id = p.id AND pvc.status = 'passed'
+      ) >= ?
+      AND EXISTS (
+        SELECT 1 FROM partner_pincodes pp
+        WHERE pp.partner_id = p.id AND pp.pincode = ?
+      )
+    `;
     let [matchingPartners]: any = await db.query(
-      `SELECT p.id, p.wallet_balance FROM partners p 
-       WHERE p.kyc_status = 'approved' AND p.status = 'active' AND p.city_id = ? AND p.wallet_balance >= ?`,
-      [cityId, leadFee]
+      `SELECT p.id, p.wallet_balance FROM partners p
+       WHERE ${clearedPartnerSql} AND p.city_id = ?`,
+      [leadFee, DOORSTEP_CHECKS.length, pincode, cityId]
     );
 
-    // If no partner specifically in this new city, fallback to any active partner with float
-    if (matchingPartners.length === 0) {
-      const [fallbackPartners]: any = await db.query(
-        `SELECT p.id, p.wallet_balance FROM partners p 
-         WHERE p.status = 'active' AND p.wallet_balance >= ? LIMIT 3`,
-        [leadFee]
-      );
-      matchingPartners = fallbackPartners;
-    }
-
     if (matchingPartners.length > 0) {
-      // Assign lead to first eligible partner or notify them
       for (const p of matchingPartners) {
         await db.query(
           "INSERT IGNORE INTO lead_assignments (lead_id, partner_id, status) VALUES (?, ?, 'assigned')",
@@ -164,10 +265,14 @@ export async function createServiceRequest(formData: FormData) {
     revalidatePath("/partner/leads");
     revalidatePath("/customer/dashboard");
 
+    const couponNote = discountAmount > 0 ? ` Coupon saved ₹${discountAmount}.` : "";
+    const notified = matchingPartners.length > 0;
     return { 
       success: true, 
       leadCode, 
-      message: `Your service request has been registered! Lead ID: ${leadCode}. Our verified technicians are being dispatched.` 
+      message: notified
+        ? `Request ${leadCode} is saved.${couponNote} A cleared technician for this pincode has been notified. Open their public ID and confirm it is green before anyone enters.`
+        : `Request ${leadCode} is saved.${couponNote} No cleared technician covers this pincode yet, so nobody has been sent. Keep this code and track it on your dashboard.`
     };
   } catch (error: any) {
     console.error("Booking Error:", error);
@@ -187,8 +292,11 @@ export async function submitPartnerApplication(formData: FormData) {
     const businessType = formData.get("businessType") as string || "Individual / Freelancer";
     const experience = Number(formData.get("experience")) || 1;
     const address = formData.get("address") as string;
-    const rawCity = (formData.get("cityName") as string) || (formData.get("cityId") as string) || "New Delhi";
-    const cityId = await getOrCreateCityId(rawCity);
+    const rawCity = String(formData.get("cityName") || formData.get("cityId") || "").trim();
+    const cityId = await findCityId(rawCity);
+    if (!cityId) {
+      return { success: false, error: "Choose a city that is already on the list." };
+    }
     const gst = formData.get("gst") as string || "";
     const pan = formData.get("pan") as string || "";
     const aadhaar = formData.get("aadhaar") as string || "";
@@ -198,11 +306,11 @@ export async function submitPartnerApplication(formData: FormData) {
     }
 
     const password = (formData.get("password") as string)?.trim();
-    if (password && password.length < 6) {
-      return { success: false, error: "Password must be at least 6 characters long." };
+    if (!password || password.length < 6) {
+      return { success: false, error: "Set a password of at least 6 characters." };
     }
 
-    const chosenPassword = password || "partner123";
+    const chosenPassword = password;
     const hashedPassword = await bcrypt.hash(chosenPassword, 10);
 
     // Check email uniqueness
@@ -270,8 +378,60 @@ export async function submitPartnerApplication(formData: FormData) {
 // ==========================================
 // 3. ADMIN: PARTNER VERIFICATION & MODERATION
 // ==========================================
+export async function setPartnerVerificationCheck(
+  partnerId: number,
+  checkKey: string,
+  status: "passed" | "failed"
+) {
+  try {
+    await ensurePortalTables();
+    const allowed = DOORSTEP_CHECKS.some((check) => check.key === checkKey);
+    if (!allowed || (status !== "passed" && status !== "failed")) {
+      return { success: false, error: "Unknown verification check." };
+    }
+
+    if (status === "passed" && checkKey === "identity") {
+      const [rows]: any = await db.query(
+        "SELECT aadhaar_number, pan_number FROM partners WHERE id = ? LIMIT 1",
+        [partnerId]
+      );
+      const idOnFile = String(rows?.[0]?.aadhaar_number || "").trim() || String(rows?.[0]?.pan_number || "").trim();
+      if (!idOnFile) {
+        return { success: false, error: "Add an Aadhaar or PAN on the partner profile before passing the ID check." };
+      }
+    }
+
+    await db.query(
+      `INSERT INTO partner_verification_checks (partner_id, check_key, status, evidence_note, checked_at)
+       VALUES (?, ?, ?, 'Reviewed by compliance desk', NOW())
+       ON DUPLICATE KEY UPDATE status = VALUES(status), evidence_note = VALUES(evidence_note), checked_at = NOW()`,
+      [partnerId, checkKey, status]
+    );
+    const [codeRows]: any = await db.query("SELECT partner_code FROM partners WHERE id = ? LIMIT 1", [partnerId]);
+    revalidatePath("/super-admin/partners");
+    revalidatePath("/partner/dashboard");
+    if (codeRows?.[0]?.partner_code) {
+      revalidatePath(`/verify/${codeRows[0].partner_code}`);
+    }
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Could not save this check." };
+  }
+}
+
 export async function updatePartnerStatus(partnerId: number, kycStatus: string, adminNotes: string) {
   try {
+    await ensurePortalTables();
+    if (kycStatus === "approved") {
+      const checks = await getPartnerProof(partnerId);
+      if (passedCheckCount(checks) < DOORSTEP_CHECKS.length) {
+        return {
+          success: false,
+          error: "Pass identity, mobile, workshop, and background checks before approving doorstep entry.",
+        };
+      }
+    }
+
     await db.query(
       "UPDATE partners SET kyc_status = ?, admin_notes = ? WHERE id = ?",
       [kycStatus, adminNotes, partnerId]
@@ -441,10 +601,23 @@ export async function bulkImportPartners(partnersList: Array<{
 export async function acceptLeadByPartner(leadId: number, partnerId: number) {
   try {
     // 1. Check partner wallet balance
-    const [partnerRows]: any = await db.query("SELECT wallet_balance, business_name FROM partners WHERE id = ?", [partnerId]);
+    const [partnerRows]: any = await db.query(
+      "SELECT wallet_balance, business_name, kyc_status, status, accepting_leads FROM partners WHERE id = ?",
+      [partnerId]
+    );
     if (partnerRows.length === 0) return { success: false, error: "Partner not found" };
 
     const partner = partnerRows[0];
+    const proof = await getPartnerProof(partnerId);
+    if (Number(partner.accepting_leads ?? 1) !== 1) {
+      return { success: false, error: "You are off today. Turn availability on before accepting a lead." };
+    }
+    if (!isDoorstepCleared(partner, passedCheckCount(proof))) {
+      return {
+        success: false,
+        error: "Your doorstep clearance is still pending. Customers can only be visited after the proof desk passes every check.",
+      };
+    }
     const [leadRows]: any = await db.query("SELECT * FROM leads WHERE id = ?", [leadId]);
     if (leadRows.length === 0) return { success: false, error: "Lead not found" };
 
@@ -456,10 +629,29 @@ export async function acceptLeadByPartner(leadId: number, partnerId: number) {
     const leadFee = Number(lead.lead_fee) || 50.00;
     const currentBalance = Number(partner.wallet_balance || 0);
 
-    // Payment/Wallet deduction bypassed as requested
-    const newBalance = currentBalance;
+    if (currentBalance < leadFee) {
+      return {
+        success: false,
+        error: `Wallet has ₹${currentBalance.toLocaleString("en-IN")}. Add at least ₹${leadFee.toLocaleString("en-IN")} before accepting this lead.`,
+      };
+    }
 
-    // Update lead status to ACCEPTED directly without blocking on payment
+    const newBalance = currentBalance - leadFee;
+    const [deducted]: any = await db.query(
+      "UPDATE partners SET wallet_balance = wallet_balance - ? WHERE id = ? AND wallet_balance >= ?",
+      [leadFee, partnerId, leadFee]
+    );
+    if (!deducted?.affectedRows) {
+      return { success: false, error: "Wallet balance changed. Refresh and try again." };
+    }
+
+    const txnCode = `TXN-LEAD-${Date.now().toString().slice(-6)}`;
+    await db.query(
+      `INSERT INTO wallet_transactions (transaction_code, partner_id, type, amount, balance_before, balance_after, description, reference_id, status)
+       VALUES (?, ?, 'LEAD_FEE', ?, ?, ?, ?, ?, 'success')`,
+      [txnCode, partnerId, leadFee, currentBalance, newBalance, `Lead fee for ${lead.lead_code}`, String(leadId)]
+    );
+
     await db.query(
       "UPDATE leads SET status = 'ACCEPTED', assigned_partner_id = ? WHERE id = ?",
       [partnerId, leadId]
@@ -476,6 +668,7 @@ export async function acceptLeadByPartner(leadId: number, partnerId: number) {
     );
 
     // 5. Send Service Verification OTP to Customer's registered Email
+    let emailSent = false;
     try {
       const [custUsers]: any = await db.query(
         `SELECT u.email, u.first_name, s.title as service_title
@@ -488,7 +681,7 @@ export async function acceptLeadByPartner(leadId: number, partnerId: number) {
       );
 
       if (custUsers.length > 0 && custUsers[0].email) {
-        await sendJobOtpEmail({
+        const mailed = await sendJobOtpEmail({
           to: custUsers[0].email,
           customerName: custUsers[0].first_name || lead.customer_name,
           otp: completionOtp,
@@ -496,9 +689,10 @@ export async function acceptLeadByPartner(leadId: number, partnerId: number) {
           serviceTitle: custUsers[0].service_title,
           technicianName: partner.business_name || "Authorized Technician",
         });
+        emailSent = mailed.success === true;
       }
     } catch (emailErr) {
-      console.error("Non-blocking OTP email dispatch error:", emailErr);
+      console.error("OTP email dispatch error:", emailErr);
     }
 
     revalidatePath("/partner/dashboard");
@@ -512,7 +706,9 @@ export async function acceptLeadByPartner(leadId: number, partnerId: number) {
     return { 
       success: true, 
       jobCode, 
-      message: `Lead accepted successfully! Job #${jobCode} has been scheduled. Verification OTP sent to customer's email.` 
+      message: emailSent
+        ? `Lead accepted. Job ${jobCode} is scheduled. The code was emailed. Ask the customer for it at the door.`
+        : `Lead accepted. Job ${jobCode} is scheduled. Email is not set up, so the customer sees the code on their booking.` 
     };
   } catch (error: any) {
     console.error("Accept Lead Error:", error);
@@ -542,7 +738,7 @@ export async function sendJobOtpToEmail(jobId: number) {
     const email = job.email;
     if (!email) return { success: false, error: "Customer does not have a valid registered email address." };
 
-    await sendJobOtpEmail({
+    const mailed = await sendJobOtpEmail({
       to: email,
       customerName: job.first_name || job.customer_name || "Valued Customer",
       otp: job.completion_otp,
@@ -550,10 +746,13 @@ export async function sendJobOtpToEmail(jobId: number) {
       serviceTitle: job.service_title,
       technicianName: job.partner_name || "Authorized Technician",
     });
+    if (!mailed.success) {
+      return { success: false, error: mailed.error || "Email could not be sent. The customer still has the code on their booking." };
+    }
 
     return { 
       success: true, 
-      message: `Service OTP successfully sent to customer's email: ${email}` 
+      message: `Code sent to ${email}.` 
     };
   } catch (error: any) {
     console.error("Resend Email OTP Error:", error);
@@ -566,6 +765,7 @@ export async function sendJobOtpToEmail(jobId: number) {
 // ==========================================
 export async function updateJobStatus(jobId: number, nextStatus: string, otpProvided?: string, finalAmount?: number) {
   try {
+    await ensurePortalTables();
     const [jobRows]: any = await db.query("SELECT * FROM jobs WHERE id = ?", [jobId]);
     if (jobRows.length === 0) return { success: false, error: "Job not found" };
 
@@ -573,24 +773,66 @@ export async function updateJobStatus(jobId: number, nextStatus: string, otpProv
 
     // If completing the job, check mandatory OTP if set
     if (nextStatus === "COMPLETED") {
-      if (job.completion_otp && otpProvided && otpProvided !== job.completion_otp) {
-        return { success: false, error: "Invalid customer completion OTP." };
+      const [otpRows]: any = await db.query(
+        "SELECT setting_value FROM system_settings WHERE setting_key = 'mandatory_job_otp' LIMIT 1"
+      );
+      const otpRequired = otpRows?.[0]?.setting_value !== "false";
+      if (otpRequired && job.completion_otp && String(otpProvided || "").trim() !== String(job.completion_otp)) {
+        return { success: false, error: "Enter the customer's completion OTP before closing this job." };
       }
 
-      const total = finalAmount || job.estimate_amount || 499.00;
-      const commissionPct = 15.00;
+      const [partnerRows]: any = await db.query(
+        "SELECT wallet_balance, total_completed_jobs FROM partners WHERE id = ?",
+        [job.partner_id]
+      );
+      const partnerRow = partnerRows?.[0] || { wallet_balance: 0, total_completed_jobs: 0 };
+      const tier = getPartnerTier(Number(partnerRow.total_completed_jobs) || 0);
+      const commissionPct = Number(String(tier.rate).replace("%", "")) || 15;
+
+      let discount = 0;
+      try {
+        const [leadRows]: any = await db.query(
+          "SELECT discount_amount FROM leads WHERE id = ? LIMIT 1",
+          [job.lead_id]
+        );
+        discount = Number(leadRows?.[0]?.discount_amount || 0);
+      } catch {
+        discount = 0;
+      }
+
+      const [billRows]: any = await db.query(
+        "SELECT qty, unit_price FROM job_bill_items WHERE job_id = ?",
+        [jobId]
+      );
+      const linesTotal = (billRows || []).reduce(
+        (sum: number, row: any) => sum + Number(row.qty || 0) * Number(row.unit_price || 0),
+        0
+      );
+      const gross = linesTotal > 0 ? linesTotal : Number(finalAmount || job.estimate_amount || 0);
+      if (!gross) return { success: false, error: "Enter the final bill amount." };
+      const total = Math.max(0, gross - discount);
       const commission = (total * commissionPct) / 100;
       const earnings = total - commission;
+      const before = Number(partnerRow.wallet_balance || 0);
+      const after = before + earnings;
 
       await db.query(
         `UPDATE jobs SET status = 'COMPLETED', final_amount = ?, platform_commission = ?, partner_earnings = ?, payment_status = 'paid' WHERE id = ?`,
         [total, commission, earnings, jobId]
       );
 
-      // Increment partner completed jobs count
-      await db.query("UPDATE partners SET total_completed_jobs = total_completed_jobs + 1 WHERE id = ?", [job.partner_id]);
+      await db.query(
+        "UPDATE partners SET total_completed_jobs = total_completed_jobs + 1, wallet_balance = ? WHERE id = ?",
+        [after, job.partner_id]
+      );
 
-      // Update lead to COMPLETED
+      const earnCode = `TXN-JOB-${Date.now().toString().slice(-6)}`;
+      await db.query(
+        `INSERT INTO wallet_transactions (transaction_code, partner_id, type, amount, balance_before, balance_after, description, reference_id, status)
+         VALUES (?, ?, 'JOB_EARNING', ?, ?, ?, ?, ?, 'success')`,
+        [earnCode, job.partner_id, earnings, before, after, `Earnings for job ${job.job_code}`, String(jobId)]
+      );
+
       await db.query("UPDATE leads SET status = 'COMPLETED' WHERE id = ?", [job.lead_id]);
     } else {
       await db.query("UPDATE jobs SET status = ? WHERE id = ?", [nextStatus, jobId]);
@@ -600,6 +842,8 @@ export async function updateJobStatus(jobId: number, nextStatus: string, otpProv
     }
 
     revalidatePath("/partner/jobs");
+    revalidatePath("/partner/wallet");
+    revalidatePath("/partner/dashboard");
     revalidatePath("/super-admin/jobs");
     revalidatePath("/customer/dashboard");
 
@@ -646,6 +890,10 @@ export async function uploadJobPhotoProof(formData: FormData) {
 // ==========================================
 export async function rechargePartnerWallet(partnerId: number, amount: number) {
   try {
+    const session: any = await getSession();
+    if (session?.role !== "SUPER_ADMIN") {
+      return { success: false, error: "Only an admin can add float." };
+    }
     if (amount <= 0) return { success: false, error: "Invalid recharge amount." };
 
     const [partnerRows]: any = await db.query("SELECT wallet_balance FROM partners WHERE id = ?", [partnerId]);
@@ -837,7 +1085,19 @@ export async function submitCustomerReview(formData: FormData) {
 // ==========================================
 export async function updatePartnerProfile(formData: FormData) {
   try {
+    await ensurePortalTables();
     const partnerId = Number(formData.get("partnerId"));
+    const session: any = await getSession();
+    if (!session?.id) return { success: false, error: "Login required." };
+    if (session.role !== "SUPER_ADMIN") {
+      const [own]: any = await db.query(
+        "SELECT id FROM partners WHERE user_id = ? AND id = ? LIMIT 1",
+        [session.id, partnerId]
+      );
+      if (!own?.length) return { success: false, error: "You can edit only your workshop." };
+    }
+    const pins = parsePincodes(String(formData.get("pincodes") || ""));
+    if (pins.error) return { success: false, error: pins.error };
     const businessName = formData.get("businessName") as string;
     const phone = formData.get("phone") as string;
     const address = formData.get("address") as string;
@@ -847,25 +1107,23 @@ export async function updatePartnerProfile(formData: FormData) {
     const aadhaarNumber = formData.get("aadhaarNumber") as string || "";
     const serviceRadius = Number(formData.get("serviceRadius")) || 20;
 
-    const cityName = formData.get("cityName") as string;
-    let cityId: number | null = null;
-    if (cityName && cityName.trim()) {
-      cityId = await getOrCreateCityId(cityName);
+    const cityName = String(formData.get("cityName") || "");
+    const cityId = await findCityId(cityName);
+    if (!cityId) {
+      return { success: false, error: "Choose a city that is already on the list." };
     }
 
-    if (cityId) {
+    await db.query(
+      `UPDATE partners 
+       SET business_name = ?, business_address = ?, experience_years = ?, gst_number = ?, pan_number = ?, aadhaar_number = ?, service_radius_km = ?, city_id = ?
+       WHERE id = ?`,
+      [businessName, address, experience, gstNumber, panNumber, aadhaarNumber, serviceRadius, cityId, partnerId]
+    );
+    await db.query("DELETE FROM partner_pincodes WHERE partner_id = ?", [partnerId]);
+    for (const pin of pins.pins) {
       await db.query(
-        `UPDATE partners 
-         SET business_name = ?, business_address = ?, experience_years = ?, gst_number = ?, pan_number = ?, aadhaar_number = ?, service_radius_km = ?, city_id = ?
-         WHERE id = ?`,
-        [businessName, address, experience, gstNumber, panNumber, aadhaarNumber, serviceRadius, cityId, partnerId]
-      );
-    } else {
-      await db.query(
-        `UPDATE partners 
-         SET business_name = ?, business_address = ?, experience_years = ?, gst_number = ?, pan_number = ?, aadhaar_number = ?, service_radius_km = ?
-         WHERE id = ?`,
-        [businessName, address, experience, gstNumber, panNumber, aadhaarNumber, serviceRadius, partnerId]
+        "INSERT INTO partner_pincodes (partner_id, pincode) VALUES (?, ?)",
+        [partnerId, pin]
       );
     }
 

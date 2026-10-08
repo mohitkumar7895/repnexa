@@ -81,7 +81,7 @@ export function ThemeToggle({
           : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900"
       } ${className}`}
     >
-      <span className="text-sm transition-transform duration-300 group-hover:scale-115">
+      <span className="text-sm transition-transform duration-300 group-hover:scale-110">
         {isDark ? "🌙" : "☀️"}
       </span>
       {showLabel && (

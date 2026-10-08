@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { DOORSTEP_CHECKS, getPartnerProof, isDoorstepCleared, passedCheckCount } from "@/lib/verification";
+import { SUPPORT_PHONE_TEL } from "@/lib/contact";
 
 export default async function PartnerVerificationPage({
   params,
@@ -8,8 +9,8 @@ export default async function PartnerVerificationPage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-
-  const [partnerRows]: any = await db.query(`
+  const [partnerRows]: any = await db.query(
+    `
     SELECT p.*, c.name as city_name, s.name as state_name, u.first_name, u.last_name, u.phone as contact_phone
     FROM partners p
     LEFT JOIN cities c ON p.city_id = c.id
@@ -17,160 +18,103 @@ export default async function PartnerVerificationPage({
     LEFT JOIN users u ON p.user_id = u.id
     WHERE p.partner_code = ?
     LIMIT 1
-  `, [code]);
+  `,
+    [code]
+  );
 
-  if (partnerRows.length === 0) {
-    // If not found in DB, provide helpful fallback for demo code or return notFound
-    if (code !== "PTR-DEL-1001") {
-      return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-white rounded-2xl border border-rose-200 p-8 text-center space-y-4 shadow-sm">
-            <span className="text-4xl">⚠️</span>
-            <h1 className="text-lg font-bold text-rose-900">Technician Credential Not Found</h1>
-            <p className="text-xs text-slate-600">
-              The partner verification code <strong className="font-mono">{code}</strong> could not be authenticated in the official Repnexa registry. Please do not permit unverified technicians inside without contacting support.
-            </p>
-            <div className="pt-2">
-              <Link href="/" className="inline-block px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold">
-                Return to Repnexa Home
-              </Link>
-            </div>
-          </div>
+  if (!partnerRows?.length) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-rose-200 p-8 text-center space-y-4 shadow-sm">
+          <h1 className="text-lg font-bold text-rose-900">This ID is not in the Repnexa registry</h1>
+          <p className="text-xs text-slate-600">
+            Unknown code <strong className="font-mono">{code}</strong>. Do not allow entry.
+          </p>
+          <Link href="/support" className="inline-block px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold">
+            Contact support
+          </Link>
         </div>
-      );
-    }
+      </div>
+    );
   }
 
-  const partner = partnerRows[0] || {
-    id: 1,
-    partner_code: "PTR-DEL-1001",
-    business_name: "Sharma Cooling Solutions",
-    first_name: "Ramesh",
-    last_name: "Sharma",
-    contact_phone: "7895094129",
-    city_name: "New Delhi",
-    state_name: "Delhi NCR",
-    kyc_status: "approved",
-    tier_level: "GOLD",
-    rating: 4.9,
-    total_completed_jobs: 128,
-    experience_years: 8,
-  };
-
-  const fullName = partner.first_name ? `${partner.first_name} ${partner.last_name || ""}` : partner.business_name;
-  const isApproved = partner.kyc_status === "approved";
+  const partner = partnerRows[0];
+  const checks = await getPartnerProof(partner.id);
+  const cleared = isDoorstepCleared(partner, passedCheckCount(checks));
+  const fullName = partner.first_name ? `${partner.first_name} ${partner.last_name || ""}`.trim() : partner.business_name;
+  const rating = Number(partner.rating) > 0 ? Number(partner.rating).toFixed(1) : null;
+  const jobs = Number(partner.total_completed_jobs) || 0;
+  const phone = String(partner.contact_phone || "");
+  const maskedPhone = phone.length >= 4 ? `•••• ${phone.slice(-4)}` : "Not on file";
 
   return (
     <div className="min-h-screen bg-slate-100 py-10 px-4 sm:px-6">
       <div className="max-w-xl mx-auto bg-white rounded-3xl border border-slate-200 shadow-lg overflow-hidden">
-        {/* Verification Status Header */}
-        <div className={`p-6 text-white text-center ${isApproved ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700" : "bg-amber-600"}`}>
-          <div className="w-16 h-16 rounded-full bg-white/20 border-2 border-white flex items-center justify-center text-3xl mx-auto mb-3 shadow-inner">
-            {isApproved ? "✓" : "⏳"}
-          </div>
-
-          <span className="text-2xs font-extrabold uppercase tracking-widest bg-white/20 px-3 py-1 rounded-full">
-            OFFICIAL REPNEXA COMPLIANCE CHECK
-          </span>
-
-          <h1 className="text-2xl font-black mt-2">
-            {isApproved ? "VERIFIED SERVICE TECHNICIAN" : "VERIFICATION IN PROGRESS"}
-          </h1>
-
-          <p className="text-xs text-emerald-100 mt-1">
-            Certified Doorstep Appliance Professional • Valid for Home & Commercial Entry
+        <div className={`p-6 text-white text-center ${cleared ? "bg-emerald-700" : "bg-rose-700"}`}>
+          <p className="text-2xs font-extrabold uppercase tracking-widest">{cleared ? "Doorstep clearance passed" : "Do not allow entry"}</p>
+          <h1 className="text-2xl font-black mt-2">{cleared ? "Cleared" : "Not cleared"}</h1>
+          <p className="text-xs mt-2 text-white/80">
+            {cleared ? "Match the name. Then start." : "No OTP. No entry."}
           </p>
         </div>
 
-        {/* Technician Profile Card */}
         <div className="p-6 sm:p-8 space-y-6">
-          <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
-            <div className="w-16 h-16 rounded-2xl bg-purple-100 border-2 border-purple-600 flex items-center justify-center text-3xl shrink-0 shadow-xs">
-              👨‍🔧
+          <div>
+            <p className="text-xs font-mono text-slate-400">{partner.partner_code}</p>
+            <h2 className="text-lg font-black text-slate-900">{fullName}</h2>
+            <p className="text-sm text-slate-600">{partner.business_name}</p>
+            <p className="text-xs text-slate-500 mt-1">
+              {partner.city_name || "City on file"}{partner.state_name ? `, ${partner.state_name}` : ""} · Mobile {maskedPhone}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Proof checks</h3>
+            {DOORSTEP_CHECKS.map((definition) => {
+              const check = checks.find((item) => item.key === definition.key);
+              const status = check?.status || "pending";
+              const tone = status === "passed"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : status === "failed"
+                  ? "border-rose-200 bg-rose-50 text-rose-900"
+                  : "border-amber-200 bg-amber-50 text-amber-900";
+              return (
+                <div key={definition.key} className={`rounded-xl border px-3 py-2.5 ${tone}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-bold">{definition.label}</span>
+                    <span className="text-3xs font-black uppercase">{status}</span>
+                  </div>
+                  <p className="text-2xs mt-1 opacity-80">{definition.detail}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="rounded-xl border border-slate-200 p-3">
+              <div className="text-3xs uppercase font-bold text-slate-400">Rating</div>
+              <div className="font-black text-slate-900 mt-1">{rating ? `★ ${rating}` : "No reviews yet"}</div>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-3xs font-extrabold uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">
-                  ★ {partner.tier_level || "GOLD"} PRO
-                </span>
-                <span className="text-2xs text-slate-400 font-mono">
-                  {partner.partner_code}
-                </span>
-              </div>
-              <h2 className="text-base font-extrabold text-slate-900 truncate mt-0.5">
-                {fullName}
-              </h2>
-              <p className="text-xs text-slate-600 font-medium truncate">
-                {partner.business_name}
-              </p>
-              <p className="text-2xs text-purple-700 font-semibold mt-0.5">
-                📍 {partner.city_name || "New Delhi"}, {partner.state_name || "Delhi NCR"}
-              </p>
+            <div className="rounded-xl border border-slate-200 p-3">
+              <div className="text-3xs uppercase font-bold text-slate-400">Completed jobs</div>
+              <div className="font-black text-slate-900 mt-1">{jobs}</div>
             </div>
           </div>
 
-          {/* Key Security Credentials */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Security & Verification Checks
-            </h3>
-
-            <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-              <div className="p-3 flex items-center justify-between text-xs">
-                <span className="text-slate-600 font-medium">Government ID (Aadhaar / PAN)</span>
-                <span className="font-bold text-emerald-700 flex items-center gap-1">
-                  <span>✓</span> Verified by Compliance
-                </span>
-              </div>
-
-              <div className="p-3 flex items-center justify-between text-xs">
-                <span className="text-slate-600 font-medium">Police Criminal Record Check</span>
-                <span className="font-bold text-emerald-700 flex items-center gap-1">
-                  <span>✓</span> Cleared & Documented
-                </span>
-              </div>
-
-              <div className="p-3 flex items-center justify-between text-xs">
-                <span className="text-slate-600 font-medium">Field Experience</span>
-                <span className="font-bold text-slate-900">
-                  {partner.experience_years || 8}+ Years Verified
-                </span>
-              </div>
-
-              <div className="p-3 flex items-center justify-between text-xs">
-                <span className="text-slate-600 font-medium">Customer Service Rating</span>
-                <span className="font-bold text-amber-500">
-                  ★ {Number(partner.rating || 4.9).toFixed(1)} / 5.0 ({partner.total_completed_jobs || 128} Completed Repairs)
-                </span>
-              </div>
-            </div>
+          <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-xs text-slate-700 space-y-1">
+            <p className="font-bold text-slate-900">Before work</p>
+            <p>Name must match.</p>
+            <p>OTP only after the test, and only if this page is green.</p>
+            <p>Red page: stop and call support.</p>
           </div>
 
-          {/* Customer Safety Advisory */}
-          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-2 text-xs text-amber-900">
-            <div className="flex items-center space-x-2 font-bold text-amber-950">
-              <span>🛡️</span>
-              <span>Customer Safety Instructions:</span>
-            </div>
-            <ul className="space-y-1 text-2xs text-amber-800 list-disc list-inside">
-              <li>Confirm the technician&#39;s face and name match the details above.</li>
-              <li>All repairs are performed by Repnexa&#39;s <strong>Verified Doorstep Technicians</strong>.</li>
-              <li>Only share your <strong>4-Digit Job Completion OTP</strong> after the technician finishes the repair and you have thoroughly tested the appliance.</li>
-            </ul>
-          </div>
-
-          {/* Emergency & Support */}
-          <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-            <div>
-              <span className="text-3xs text-slate-400 uppercase font-semibold block">Questions or Concerns?</span>
-              <span className="text-xs font-bold text-slate-900">Repnexa Trust & Safety Helpline</span>
-            </div>
-            <a
-              href="tel:+917895094129"
-              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs"
-            >
-              📞 Call +91 78950 94129
+          <div className="flex flex-col sm:flex-row gap-2">
+            <a href={`tel:${SUPPORT_PHONE_TEL}`} className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold text-center">
+              Call trust and safety
             </a>
+            <Link href="/support" className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-xs font-bold text-center">
+              Raise a complaint
+            </Link>
           </div>
         </div>
       </div>

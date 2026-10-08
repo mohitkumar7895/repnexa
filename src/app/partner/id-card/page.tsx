@@ -1,32 +1,13 @@
-import { db } from "@/lib/db";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DigitalIdCard } from "@/components/partner/DigitalIdCard";
+import { getCurrentPartner } from "@/lib/partner";
+import { getPartnerProof, isDoorstepCleared, passedCheckCount } from "@/lib/verification";
 import Link from "next/link";
 
 export default async function PartnerIdCardPage() {
-  const [partnerRows]: any = await db.query(`
-    SELECT p.*, c.name as city_name, s.name as state_name, u.phone as contact_phone, u.first_name, u.last_name, u.email
-    FROM partners p
-    LEFT JOIN cities c ON p.city_id = c.id
-    LEFT JOIN states s ON p.state_id = s.id
-    LEFT JOIN users u ON p.user_id = u.id
-    WHERE p.partner_code = 'PTR-DEL-1001'
-    LIMIT 1
-  `);
-
-  const partner = partnerRows[0] || {
-    id: 1,
-    partner_code: "PTR-DEL-1001",
-    business_name: "Sharma Cooling Solutions",
-    first_name: "Ramesh",
-    last_name: "Sharma",
-    contact_phone: "7895094129",
-    city_name: "New Delhi",
-    state_name: "Delhi NCR",
-    kyc_status: "approved",
-    tier_level: "GOLD",
-    experience_years: 8,
-  };
+  const partner = await getCurrentPartner();
+  const proof = partner.id ? await getPartnerProof(partner.id) : [];
+  const cleared = isDoorstepCleared(partner, passedCheckCount(proof));
 
   return (
     <div className="space-y-6">
@@ -51,7 +32,7 @@ export default async function PartnerIdCardPage() {
         </PageHeader>
       </div>
 
-      <DigitalIdCard partner={partner} />
+      <DigitalIdCard partner={{ ...partner, cleared }} />
     </div>
   );
 }

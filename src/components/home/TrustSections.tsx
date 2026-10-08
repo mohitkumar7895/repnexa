@@ -3,26 +3,26 @@ export function WhyChooseUs() {
     {
       icon: "🛡️",
       color: "bg-orange-100 text-orange-600",
-      title: "100% Police Verified",
-      desc: "Every service partner undergoes identity check, Aadhaar, PAN validation, and workshop background screening before onboarding.",
+      title: "4 checks first",
+      desc: "Green ID, then entry.",
     },
     {
       icon: "🛡️",
       color: "bg-purple-100 text-purple-600",
       title: "Zero Advance Payment",
-      desc: "Pay only after doorstep service is complete and tested. No advance deposit or hidden charges required.",
+      desc: "Pay after the test.",
     },
     {
       icon: "⏱️",
       color: "bg-pink-100 text-pink-600",
-      title: "60-Min Quick Dispatch",
-      desc: "Smart localized lead distribution matches the nearest active technician within a 15km radius of your residence.",
+      title: "Your city only",
+      desc: "No match, no visit.",
     },
     {
       icon: "🏷️",
       color: "bg-emerald-100 text-emerald-600",
       title: "Doorstep Satisfaction",
-      desc: "Repairs performed at your doorstep by certified, background-checked appliance technicians with transparent inspection.",
+      desc: "Test first. Then pay.",
     },
   ];
 
@@ -37,7 +37,7 @@ export function WhyChooseUs() {
             Why Indian Households Trust Repnexa
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-2">
-            Every service is backed by corporate accountability, strict safety measures, and transparent invoicing.
+            Clear checks. Clear bill.
           </p>
         </div>
 
@@ -62,25 +62,25 @@ export function HowItWorks() {
     {
       num: 1,
       title: "Choose Service & Time",
-      desc: "Pick your appliance, tell us the issue, and select a convenient 2-hour doorstep slot.",
+      desc: "Appliance, issue, time.",
       badgeColor: "bg-slate-900",
     },
     {
       num: 2,
       title: "Technician Matched",
-      desc: "Our engine alerts verified technicians in your sector. You receive partner name and contact.",
+      desc: "Cleared technician in your city.",
       badgeColor: "bg-slate-900",
     },
     {
       num: 3,
       title: "Doorstep OTP & Repair",
-      desc: "Technician inspects your machine, quotes parts transparently, and begins repair with your OTP.",
+      desc: "Green ID. OTP after the test.",
       badgeColor: "bg-slate-900",
     },
     {
       num: 4,
       title: "Test & Digital Invoice",
-      desc: "Pay only after doorstep testing and demonstration. Receive your official digital completion invoice and leave a verified review.",
+      desc: "Test, pay, invoice.",
       badgeColor: "bg-emerald-600",
     },
   ];
@@ -96,7 +96,7 @@ export function HowItWorks() {
             How Doorstep Repair Works
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-2">
-            From instant slot booking to job OTP completion and digital invoice
+            Book, match, test, pay.
           </p>
         </div>
 

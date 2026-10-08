@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { logoutUser } from "@/app/actions/auth-actions";
+import { getSession } from "@/lib/auth";
 import { PortalShell, NavSection } from "@/components/portal/PortalShell";
 
 const SUPER_ADMIN_NAV: NavSection[] = [
@@ -59,15 +60,19 @@ export default async function SuperAdminLayout({ children }: { children: ReactNo
     await logoutUser("/super-admin/login");
   }
 
+  const session: any = await getSession();
+  const adminName = session?.name || "Super Admin";
+  const adminEmail = session?.email || "";
+
   return (
     <PortalShell
       portalBadge={{ text: "Admin", colorClass: "bg-purple-600" }}
       logoHref="/super-admin/dashboard"
       navSections={SUPER_ADMIN_NAV}
       userProfile={{
-        name: "Super Admin",
+        name: adminName,
         subtitle: "All India Control",
-        avatarText: "SA",
+        avatarText: adminName.slice(0, 2).toUpperCase() || "SA",
         avatarColorClass: "bg-purple-600",
       }}
       logoutAction={handleLogout}
@@ -75,10 +80,12 @@ export default async function SuperAdminLayout({ children }: { children: ReactNo
       headerSubtitle="| Repnexa Services India"
       headerRightContent={
         <>
-          <span className="text-slate-500">superadmin@repnexa.com</span>
+          {adminEmail && (
+            <span className="hidden md:inline text-slate-500 truncate max-w-[180px]">{adminEmail}</span>
+          )}
           <Link
             href="/"
-            className="px-2.5 py-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-50"
+            className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
           >
             View Website
           </Link>

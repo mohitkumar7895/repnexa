@@ -1,350 +1,317 @@
 import { db } from "@/lib/db";
-import { acceptLeadByPartner } from "@/app/actions/portal-actions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { AcceptLeadButton } from "@/components/partner/AcceptLeadButton";
+import { getCurrentPartner, getPartnerTier } from "@/lib/partner";
+import { getPartnerProof, isDoorstepCleared, passedCheckCount } from "@/lib/verification";
 import Link from "next/link";
+import { AvailabilityToggle } from "@/components/partner/AvailabilityToggle";
+import { ensurePortalTables } from "@/lib/portal-setup";
 
 export default async function PartnerDashboardPage() {
-  // Fetch demo partner: Sharma Cooling Solutions
-  const [partnerRows]: any = await db.query(`
-    SELECT p.*, c.name as city_name, s.name as state_name, u.phone as contact_phone
-    FROM partners p
-    LEFT JOIN cities c ON p.city_id = c.id
-    LEFT JOIN states s ON p.state_id = s.id
-    LEFT JOIN users u ON p.user_id = u.id
-    WHERE p.partner_code = 'PTR-DEL-1001' 
-    LIMIT 1
-  `);
+  const partner = await getCurrentPartner();
+  await ensurePortalTables();
+  const acceptingLeads = Number(partner.accepting_leads ?? 1) === 1;
+  const jobsDone = Number(partner.total_completed_jobs) || 0;
+  const rating = Number(partner.rating) || 0;
+  const tier = getPartnerTier(jobsDone);
 
-  const partner = partnerRows[0] || { 
-    id: 1, 
-    partner_code: 'PTR-DEL-1001',
-    wallet_balance: 0, 
-    rating: 0.0, 
-    total_completed_jobs: 0, 
-    business_name: 'Partner Workspace',
-    kyc_status: 'approved',
-    city_name: 'New Delhi',
-    state_name: 'Delhi NCR',
-    service_radius_km: 20
-  };
+  let availableLeads: any[] = [];
+  let activeJobs: any[] = [];
 
-  // Fetch Available Leads
-  const [availableLeads]: any = await db.query(`
-    SELECT l.*, s.title as service_title, c.name as city_name
-    FROM leads l
-    LEFT JOIN services s ON l.service_id = s.id
-    LEFT JOIN cities c ON l.city_id = c.id
-    WHERE l.status IN ('NEW', 'MATCHING', 'ASSIGNED')
-    ORDER BY l.id DESC
-    LIMIT 5
-  `);
+  try {
+    const [leadRows]: any = await db.query(
+      `
+      SELECT l.*, s.title as service_title, c.name as city_name
+      FROM leads l
+      LEFT JOIN services s ON l.service_id = s.id
+      LEFT JOIN cities c ON l.city_id = c.id
+      WHERE l.status IN ('NEW', 'MATCHING', 'ASSIGNED')
+        AND (l.assigned_partner_id IS NULL OR l.assigned_partner_id = ?)
+        AND NOT EXISTS (
+          SELECT 1 FROM jobs jx
+          WHERE jx.lead_id = l.id AND jx.status <> 'CANCELLED'
+        )
+        AND ? = 1
+        AND EXISTS (
+          SELECT 1 FROM partner_pincodes pp
+          WHERE pp.partner_id = ? AND pp.pincode = l.pincode
+        )
+      ORDER BY l.id DESC
+      LIMIT 5
+    `,
+      [partner.id, acceptingLeads ? 1 : 0, partner.id]
+    );
+    availableLeads = leadRows || [];
 
-  // Fetch Partner Active Jobs
-  const [activeJobs]: any = await db.query(`
-    SELECT j.*, l.lead_code, l.customer_name, l.customer_phone, l.customer_address, s.title as service_title
-    FROM jobs j
-    LEFT JOIN leads l ON j.lead_id = l.id
-    LEFT JOIN services s ON l.service_id = s.id
-    WHERE j.partner_id = ? AND j.status != 'COMPLETED' AND j.status != 'CANCELLED'
-    ORDER BY j.id DESC
-  `, [partner.id]);
+    const [jobRows]: any = await db.query(
+      `
+      SELECT j.*, l.lead_code, l.customer_name, l.customer_phone, l.customer_address, s.title as service_title
+      FROM jobs j
+      LEFT JOIN leads l ON j.lead_id = l.id
+      LEFT JOIN services s ON l.service_id = s.id
+      WHERE j.partner_id = ? AND j.status != 'COMPLETED' AND j.status != 'CANCELLED'
+      ORDER BY j.id DESC
+    `,
+      [partner.id]
+    );
+    activeJobs = jobRows || [];
+  } catch {
+    availableLeads = [];
+    activeJobs = [];
+  }
 
   const floatBalance = Number(partner.wallet_balance || 0);
   const potentialLeads = Math.floor(floatBalance / 50);
+  const lowFloat = floatBalance < 50;
+  const proof = partner.id ? await getPartnerProof(partner.id) : [];
+  const doorstepCleared = isDoorstepCleared(partner, passedCheckCount(proof));
+  const kycApproved = doorstepCleared;
 
   return (
     <div className="space-y-6">
-      {/* 1. Header */}
       <PageHeader
         title={partner.business_name}
-        subtitle={`${partner.city_name || "Delhi NCR"} Hub • ${partner.service_radius_km || 20}km Service Area`}
-        badge={`Tier: ${partner.tier_level || "GOLD"}`}
+        subtitle={`${partner.city_name || "Delhi NCR"} • ${partner.service_radius_km || 20} km service area`}
+        badge={tier.name}
       >
-        <Link 
-          href="/partner/id-card" 
-          className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold shadow-2xs transition-colors"
+        <Link
+          href="/partner/id-card"
+          className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 text-xs font-semibold shadow-2xs"
         >
-          🪪 ID Card
+          ID Card
         </Link>
-        <Link 
-          href="/partner/referrals" 
-          className="px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold shadow-xs transition-colors"
-        >
-          🎁 Refer (+₹100)
-        </Link>
-        <Link 
-          href="/partner/wallet" 
-          className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold shadow-2xs transition-colors"
+        <Link
+          href="/partner/wallet"
+          className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 text-xs font-semibold shadow-2xs"
         >
           Wallet
         </Link>
-        <Link 
-          href="/partner/leads" 
-          className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs transition-colors"
+        <AvailabilityToggle partnerId={Number(partner.id) || 0} accepting={acceptingLeads} />
+        <Link
+          href="/partner/leads"
+          className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs"
         >
-          Available Leads ({availableLeads.length})
+          Leads ({availableLeads.length})
         </Link>
       </PageHeader>
 
-      {/* 2. Wallet & Float Quick Bar */}
-      <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-5 border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xs">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-lg text-emerald-400 shrink-0">
-            ₹
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-base font-bold text-white tracking-tight">
-                ₹{floatBalance.toLocaleString('en-IN', { minimumFractionDigits: 0 })}
-              </span>
-              <span className="text-3xs font-semibold text-emerald-400 bg-emerald-950/70 border border-emerald-800 px-2 py-0.5 rounded-full">
-                Active Float
-              </span>
+      {!kycApproved && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p>
+            <span className="font-bold">Proof {passedCheckCount(proof)}/4.</span> Leads stay locked.
+          </p>
+          <Link href="/partner/profile" className="px-3 py-1.5 rounded-lg bg-amber-700 text-white font-semibold text-2xs shrink-0">
+            Finish profile
+          </Link>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <section className="rounded-2xl bg-slate-900 text-white p-5 border border-slate-800 shadow-xs">
+          <p className="text-2xs font-bold uppercase tracking-wider text-slate-400">Active float</p>
+          <div className="mt-2 flex items-end justify-between gap-3">
+            <div>
+              <div className="text-3xl font-black tracking-tight font-mono">
+                ₹{floatBalance.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+              </div>
+              <p className="text-2xs text-slate-400 mt-1">
+                {potentialLeads === 1
+                  ? "About 1 lead at ₹50"
+                  : `About ${potentialLeads} leads at ₹50 each`}
+              </p>
             </div>
-            <p className="text-2xs text-slate-400 mt-0.5">
-              Capacity for ~{potentialLeads} leads • You keep 85% of customer billing
+            <span className={`text-3xs font-bold px-2 py-1 rounded-full border ${lowFloat ? "border-amber-400/40 text-amber-300 bg-amber-400/10" : "border-emerald-400/40 text-emerald-300 bg-emerald-400/10"}`}>
+              {lowFloat ? "Low balance" : "Healthy"}
+            </span>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Link href="/partner/wallet" className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs">
+              Add funds
+            </Link>
+            <Link href="/partner/withdrawals" className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700">
+              Withdraw
+            </Link>
+          </div>
+        </section>
+
+        <section className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <p className="text-2xs font-bold uppercase tracking-wider text-slate-500">Partner tier</p>
+            <span className="text-3xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-400/15 dark:text-amber-200">
+              {tier.rate} commission
+            </span>
+          </div>
+          <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{tier.name}</div>
+          <p className="text-2xs text-slate-500 mt-1">
+            {tier.next ? `${jobsDone} of ${tier.target} jobs to reach ${tier.next}` : `${jobsDone} verified jobs · top tier`}
+          </p>
+          <div className="mt-3 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+            <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-purple-600" style={{ width: `${tier.progress}%` }} />
+          </div>
+        </section>
+
+        <section className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-5 shadow-xs flex flex-col justify-between">
+          <div>
+            <p className="text-2xs font-bold uppercase tracking-wider text-slate-500">Referral desk</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">Earn ₹100 for every technician who joins</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Invite code <span className="font-mono font-bold text-purple-700 dark:text-purple-300">{partner.referral_code || partner.partner_code}</span>
             </p>
           </div>
-        </div>
-
-        <div className="flex items-center space-x-2 shrink-0">
-          <Link
-            href="/partner/wallet"
-            className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shadow-xs"
-          >
-            + Add Funds
+          <Link href="/partner/referrals" className="mt-4 inline-flex w-fit px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold">
+            Share invite
           </Link>
-          <Link
-            href="/partner/withdrawals"
-            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition-all shadow-xs"
-          >
-            Withdraw
-          </Link>
-        </div>
+        </section>
       </div>
 
-      {/* 2B. Gamification Tier & Referral Quick Bar */}
-      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white rounded-2xl p-4 sm:p-5 border border-purple-800/60 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex items-center space-x-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-xl shadow-inner shrink-0">
-            🥇
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-3xs font-extrabold uppercase px-2 py-0.5 rounded bg-amber-400 text-amber-950">
-                ★ {partner.tier_level || "GOLD"} MASTER PRO
-              </span>
-              <span className="text-2xs text-purple-200">
-                12% Commission (3% Preferred Rate)
-              </span>
-            </div>
-            <p className="text-xs text-slate-300 mt-1">
-              Invite code: <strong className="font-mono text-amber-300">{partner.referral_code || "REF-DEL-1001"}</strong> • Earn ₹100 for every technician who joins Repnexa!
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto">
-          <Link
-            href="/partner/referrals"
-            className="flex-1 md:flex-initial text-center px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-xs transition-all"
-          >
-            🎁 Refer & Earn (+₹100)
-          </Link>
-          <Link
-            href="/partner/id-card"
-            className="flex-1 md:flex-initial text-center px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition-all"
-          >
-            🪪 ID Badge
-          </Link>
-        </div>
-      </div>
-
-      {/* 3. Stat Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           label="Wallet Balance"
-          value={`₹${floatBalance.toLocaleString('en-IN')}`}
+          value={`₹${floatBalance.toLocaleString("en-IN")}`}
           subtext={`~${potentialLeads} leads capacity`}
-          badge="Live"
-          badgeColor="emerald"
-          valueColor="text-emerald-700"
-          icon="💳"
+          badge={lowFloat ? "Low" : "Live"}
+          badgeColor={lowFloat ? "orange" : "emerald"}
+          valueColor="text-emerald-700 dark:text-emerald-400"
         />
-
         <StatCard
           label="Active Jobs"
           value={activeJobs.length}
-          subtext={activeJobs.length > 0 ? "Requires technician visit" : "All clear"}
-          badge={activeJobs.length > 0 ? "In Field" : "Ready"}
+          subtext={activeJobs.length > 0 ? "Needs a doorstep visit" : "Nothing in the field"}
+          badge={activeJobs.length > 0 ? "In field" : "Clear"}
           badgeColor={activeJobs.length > 0 ? "purple" : "slate"}
-          valueColor="text-purple-700"
-          icon="🛠️"
+          valueColor="text-purple-700 dark:text-purple-300"
         />
-
         <StatCard
           label="Completed"
-          value={partner.total_completed_jobs || 128}
+          value={jobsDone}
           subtext="Verified completions"
           badge="Done"
           badgeColor="slate"
-          icon="✅"
         />
-
         <StatCard
           label="Rating"
-          value={`★ ${Number(partner.rating || 4.9).toFixed(1)}`}
-          subtext="Customer verified"
-          badge="Top Tech"
+          value={rating > 0 ? `★ ${rating.toFixed(1)}` : "—"}
+          subtext={rating > 0 ? "From customer reviews" : "No reviews yet"}
+          badge={rating >= 4.5 ? "Top tech" : "Live"}
           badgeColor="orange"
-          valueColor="text-amber-500"
-          icon="⭐"
+          valueColor="text-amber-600 dark:text-amber-300"
         />
       </div>
 
-      {/* 4. Two-Column Operational Split */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Left: Available Leads */}
-        <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/70 flex justify-between items-center">
-              <div>
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Available Leads ({availableLeads.length})
-                </h2>
-                <p className="text-2xs text-slate-400">Accept to unlock customer phone & address</p>
-              </div>
-              <Link href="/partner/leads" className="text-2xs font-semibold text-purple-600 hover:text-purple-800">
-                View All →
-              </Link>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
+          <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex justify-between items-center gap-3">
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">
+                Available leads ({availableLeads.length})
+              </h2>
+              <p className="text-2xs text-slate-400">Accept to see the address</p>
             </div>
+            <Link href="/partner/leads" className="text-2xs font-semibold text-purple-600 dark:text-purple-300 shrink-0">
+              View all
+            </Link>
+          </div>
 
-            <div className="divide-y divide-slate-100">
-              {availableLeads.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-400">
-                  <div className="text-xl mb-1">🎯</div>
-                  No new leads right now. New bookings will appear here instantly.
-                </div>
-              ) : (
-                availableLeads.map((lead: any) => (
-                  <div key={lead.id} className="p-4 hover:bg-slate-50/70 transition-colors">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {availableLeads.length === 0 ? (
+              <div className="p-10 text-center">
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">No open leads right now</p>
+                <p className="text-xs text-slate-500 mt-1">New bookings in your pincodes will land here.</p>
+              </div>
+            ) : (
+              availableLeads.map((lead: any) => {
+                const fee = Number(lead.lead_fee || 0);
+                return (
+                  <div key={lead.id} className="p-4 hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
                     <div className="flex justify-between items-start gap-3">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="px-2 py-0.5 rounded text-3xs font-bold bg-purple-50 text-purple-700 border border-purple-200/60 font-mono">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2 py-0.5 rounded text-3xs font-bold bg-purple-50 text-purple-700 border border-purple-200/60 font-mono dark:bg-purple-950/50 dark:text-purple-200 dark:border-purple-800">
                             {lead.lead_code}
                           </span>
                           <span className="text-2xs text-slate-400">
-                            Slot: <strong className="text-slate-700">{lead.preferred_time || "Today"}</strong>
+                            Slot <strong className="text-slate-700 dark:text-slate-200">{lead.preferred_time || "Flexible"}</strong>
                           </span>
                         </div>
-                        <h3 className="font-semibold text-slate-900 text-xs mt-1">{lead.service_title}</h3>
+                        <h3 className="font-semibold text-slate-900 dark:text-white text-xs mt-1">{lead.service_title || "Service request"}</h3>
                         <p className="text-2xs text-slate-500 mt-0.5 line-clamp-1">{lead.problem_description}</p>
                         <div className="text-2xs text-slate-400 mt-1">
-                          📍 {lead.city_name} • {lead.pincode || "110001"}
+                          {lead.city_name || "City pending"} · {lead.pincode || "PIN pending"}
                         </div>
                       </div>
-
-                      <div className="text-right shrink-0 flex flex-col items-end">
-                        <span className="text-2xs font-medium text-slate-500">₹{Number(lead.lead_fee).toFixed(0)} fee</span>
-                        <form action={async () => {
-                          "use server";
-                          await acceptLeadByPartner(lead.id, partner.id);
-                        }} className="mt-1.5">
-                          <button 
-                            type="submit" 
-                            disabled={floatBalance < Number(lead.lead_fee)}
-                            className={`px-3 py-1.5 rounded-lg text-white font-semibold text-2xs transition-all cursor-pointer shadow-2xs ${
-                              floatBalance >= Number(lead.lead_fee)
-                                ? "bg-orange-600 hover:bg-orange-700"
-                                : "bg-slate-300 cursor-not-allowed text-slate-500"
-                            }`}
-                          >
-                            Accept Lead
-                          </button>
-                        </form>
+                      <div className="text-right shrink-0">
+                        <span className="text-2xs font-medium text-slate-500">₹{fee.toLocaleString("en-IN")} fee</span>
+                        <div className="mt-1.5">
+                          {doorstepCleared ? (
+                            <AcceptLeadButton
+                              leadId={lead.id}
+                              partnerId={Number(partner.id) || 0}
+                              fee={fee}
+                              balance={floatBalance}
+                            />
+                          ) : (
+                            <span className="text-3xs font-bold text-rose-700">Clearance locked</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                );
+              })
+            )}
           </div>
+        </section>
 
-          <div className="p-3 bg-slate-50/60 border-t border-slate-100 text-center">
-            <Link href="/partner/leads" className="text-2xs font-semibold text-purple-700 hover:text-purple-900">
-              Browse All Leads ({availableLeads.length}) →
+        <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
+          <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex justify-between items-center gap-3">
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">
+                Active jobs ({activeJobs.length})
+              </h2>
+              <p className="text-2xs text-slate-400">Doorstep visits currently assigned to you</p>
+            </div>
+            <Link href="/partner/jobs" className="text-2xs font-semibold text-purple-600 dark:text-purple-300 shrink-0">
+              Jobs console
             </Link>
           </div>
-        </div>
 
-        {/* Right: Active Field Jobs */}
-        <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/70 flex justify-between items-center">
-              <div>
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Active Jobs ({activeJobs.length})
-                </h2>
-                <p className="text-2xs text-slate-400">Doorstep visits in progress</p>
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {activeJobs.length === 0 ? (
+              <div className="p-10 text-center">
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">No active jobs</p>
+                <p className="text-xs text-slate-500 mt-1">Accepted visits show up here.</p>
               </div>
-              <Link href="/partner/jobs" className="text-2xs font-semibold text-purple-600 hover:text-purple-800">
-                Jobs Console →
-              </Link>
-            </div>
-
-            <div className="divide-y divide-slate-100">
-              {activeJobs.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-400">
-                  <div className="text-xl mb-1">🛠️</div>
-                  No active jobs right now. Accept an available lead to get started.
-                </div>
-              ) : (
-                activeJobs.map((job: any) => (
-                  <div key={job.id} className="p-4 hover:bg-slate-50/70 transition-colors">
-                    <div className="flex justify-between items-start gap-3">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-mono font-bold text-slate-900 text-xs">{job.job_code}</span>
-                          <StatusBadge status={job.status} />
-                        </div>
-                        <h3 className="font-semibold text-slate-800 text-xs mt-1">{job.service_title}</h3>
-                        <p className="text-2xs text-slate-600 font-medium mt-0.5">
-                          👤 {job.customer_name} • <span className="font-mono font-semibold text-purple-700">{job.customer_phone}</span>
-                        </p>
-                        <p className="text-2xs text-slate-400 line-clamp-1 mt-0.5">📍 {job.customer_address}</p>
+            ) : (
+              activeJobs.map((job: any) => (
+                <div key={job.id} className="p-4 hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">{job.job_code}</span>
+                        <StatusBadge status={job.status} />
                       </div>
-
-                      <div className="text-right shrink-0 flex flex-col items-end">
-                        {job.completion_otp && (
-                          <div className="text-2xs text-slate-500 mb-1.5">
-                            OTP: <span className="font-mono font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">{job.completion_otp}</span>
-                          </div>
-                        )}
-                        <Link 
-                          href="/partner/jobs" 
-                          className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-2xs shadow-2xs transition-colors"
-                        >
-                          Open Job →
-                        </Link>
-                      </div>
+                      <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-xs mt-1">{job.service_title || "Service job"}</h3>
+                      <p className="text-2xs text-slate-600 dark:text-slate-300 font-medium mt-0.5">
+                        {job.customer_name || "Customer"} · <span className="font-mono font-semibold text-purple-700 dark:text-purple-300">{job.customer_phone || "—"}</span>
+                      </p>
+                      <p className="text-2xs text-slate-400 line-clamp-1 mt-0.5">{job.customer_address || "Address shared after acceptance"}</p>
+                    </div>
+                    <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
+                      <Link
+                        href="/partner/jobs"
+                        className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-2xs shadow-2xs"
+                      >
+                        Open job
+                      </Link>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                </div>
+              ))
+            )}
           </div>
-
-          <div className="p-3 bg-slate-50/60 border-t border-slate-100 text-center">
-            <Link href="/partner/jobs" className="text-2xs font-semibold text-purple-700 hover:text-purple-900">
-              Manage Ongoing Jobs & OTPs →
-            </Link>
-          </div>
-        </div>
-
+        </section>
       </div>
     </div>
   );

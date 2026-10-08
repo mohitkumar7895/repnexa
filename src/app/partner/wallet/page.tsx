@@ -1,22 +1,9 @@
 import { db } from "@/lib/db";
-import { getSession } from "@/lib/auth";
 import { RazorpayTopupButton } from "@/components/wallet/RazorpayTopupButton";
+import { getCurrentPartner } from "@/lib/partner";
 
 export default async function PartnerWalletPage() {
-  let partner = { id: 1, wallet_balance: 2500, partner_code: 'PTR-DEL-1001', business_name: 'Sharma Cooling Solutions' };
-
-  try {
-    const session: any = await getSession();
-    if (session?.id) {
-      const [pRows]: any = await db.query("SELECT id, wallet_balance, partner_code, business_name FROM partners WHERE user_id = ? LIMIT 1", [session.id]);
-      if (pRows.length > 0) partner = pRows[0];
-    } else {
-      const [partnerRows]: any = await db.query("SELECT id, wallet_balance, partner_code, business_name FROM partners WHERE partner_code = 'PTR-DEL-1001' LIMIT 1");
-      if (partnerRows.length > 0) partner = partnerRows[0];
-    }
-  } catch (e) {
-    // fallback
-  }
+  const partner = await getCurrentPartner();
 
   const [transactions]: any = await db.query(`
     SELECT * FROM wallet_transactions WHERE partner_id = ? ORDER BY id DESC LIMIT 20

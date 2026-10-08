@@ -1,11 +1,19 @@
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { updatePartnerProfile } from "@/app/actions/portal-actions";
+import { getPartnerProof, isDoorstepCleared, passedCheckCount } from "@/lib/verification";
 import { PartnerChangePasswordCard } from "@/components/partner/PartnerChangePasswordCard";
+import { ensurePortalTables } from "@/lib/portal-setup";
 
-export default async function PartnerProfilePage() {
+export default async function PartnerProfilePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ error?: string; saved?: string }>;
+}) {
+  const notice = searchParams ? await searchParams : {};
   const session: any = await getSession();
   let partnerRows: any[] = [];
 
@@ -35,23 +43,29 @@ export default async function PartnerProfilePage() {
     partnerRows = rows;
   }
 
-  const partner = partnerRows[0] || {
-    id: 1,
-    partner_code: 'PTR-DEL-1001',
-    business_name: 'Sharma Cooling Solutions',
-    business_type: 'Proprietorship',
-    experience_years: 8,
-    gst_number: '07AAAAA0000A1Z5',
-    pan_number: 'ABCDE1234F',
-    aadhaar_number: 'XXXX-XXXX-9012',
-    business_address: 'Shop 14, Main Market, Sector 18, Noida / New Delhi',
-    city_name: 'New Delhi',
-    state_name: 'Delhi NCR',
-    kyc_status: 'approved',
-    service_radius_km: 20,
-    email: 'sharma.ac@repnexa.com',
-    contact_phone: '7895094129',
-  };
+  const partner = partnerRows[0];
+  if (!partner) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Workshop profile"
+          subtitle="This login is not linked to a partner workshop."
+        />
+        <p className="text-sm text-slate-600">
+          Apply from Become a Partner. Until a workshop is linked, this account cannot accept home visits.
+        </p>
+      </div>
+    );
+  }
+
+  await ensurePortalTables();
+  const proof = await getPartnerProof(partner.id);
+  const doorstepCleared = isDoorstepCleared(partner, passedCheckCount(proof));
+  const [pinRows]: any = await db.query(
+    "SELECT pincode FROM partner_pincodes WHERE partner_id = ? ORDER BY pincode",
+    [partner.id]
+  );
+  const coveredPins = (pinRows || []).map((row: any) => row.pincode).join(", ");
 
   return (
     <div className="space-y-6">
@@ -83,9 +97,11 @@ export default async function PartnerProfilePage() {
               <span className="font-semibold text-purple-700">{partner.city_name}, {partner.state_name}</span>
             </div>
             <div>
-              <span className="text-2xs uppercase font-semibold text-slate-400 block">KYC Verification</span>
-              <span className="inline-flex items-center text-emerald-700 font-bold mt-0.5">
-                ✓ Documents Verified by Repnexa Compliance
+              <span className="text-2xs uppercase font-semibold text-slate-400 block">Doorstep proof</span>
+              <span className={`inline-flex items-center font-bold mt-0.5 ${doorstepCleared ? "text-emerald-700" : "text-rose-700"}`}>
+                {doorstepCleared
+                  ? "Cleared for home visits"
+                  : `${passedCheckCount(proof)}/4. Add Aadhaar or PAN.`}
               </span>
             </div>
           </div>
@@ -97,9 +113,19 @@ export default async function PartnerProfilePage() {
             Workshop & Operations Details
           </h2>
 
+          {notice.error && (
+            <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{notice.error}</p>
+          )}
+          {notice.saved && (
+            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">Profile saved.</p>
+          )}
           <form action={async (formData: FormData) => {
             "use server";
-            await updatePartnerProfile(formData);
+            const result = await updatePartnerProfile(formData);
+            if (!result?.success) {
+              redirect(`/partner/profile?error=${encodeURIComponent(result?.error || "Could not save.")}`);
+            }
+            redirect("/partner/profile?saved=1");
           }} className="space-y-4">
             <input type="hidden" name="partnerId" value={partner.id} />
 
@@ -188,12 +214,25 @@ export default async function PartnerProfilePage() {
                 <input
                   type="text"
                   name="cityName"
-                  defaultValue={partner.city_name || "New Delhi"}
+                  defaultValue={partner.city_name || ""}
                   placeholder="e.g. New Delhi, Noida, Mumbai"
                   required
                   className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:border-purple-600 focus:outline-none"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-2xs font-semibold text-slate-700 uppercase mb-1">Pincodes you cover *</label>
+              <input
+                type="text"
+                name="pincodes"
+                defaultValue={coveredPins}
+                required
+                placeholder="110001, 110002"
+                className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:border-purple-600 focus:outline-none font-mono"
+              />
+              <p className="text-2xs text-slate-500 mt-1">Only these pins send you a lead.</p>
             </div>
 
             <div>

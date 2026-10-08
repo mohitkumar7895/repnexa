@@ -27,8 +27,8 @@ export default async function SuperAdminReportsPage() {
     LIMIT 10
   `);
 
-  const totalGross = partnerStats.reduce((acc: number, p: any) => acc + Number(p.gross_revenue || 0), 0) || 4500;
-  const totalComm = partnerStats.reduce((acc: number, p: any) => acc + Number(p.commission_earned || 0), 0) || 675;
+  const totalGross = partnerStats.reduce((acc: number, p: any) => acc + Number(p.gross_revenue || 0), 0);
+  const totalComm = partnerStats.reduce((acc: number, p: any) => acc + Number(p.commission_earned || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -100,16 +100,16 @@ export default async function SuperAdminReportsPage() {
                   {p.total_completed_jobs || p.job_count || 0} Jobs
                 </td>
                 <td className="px-4 py-3 text-amber-500 font-bold">
-                  ★ {Number(p.rating || 4.8).toFixed(1)}
+                  ★ {Number(p.rating) > 0 ? Number(p.rating).toFixed(1) : "—"}
                 </td>
                 <td className="px-4 py-3 font-mono font-bold text-slate-900">
-                  ₹{Number(p.gross_revenue || 699).toFixed(2)}
+                  ₹{Number(p.gross_revenue || 0).toFixed(2)}
                 </td>
                 <td className="px-4 py-3 font-mono font-bold text-purple-700">
-                  ₹{Number(p.commission_earned || 104.85).toFixed(2)}
+                  ₹{Number(p.commission_earned || 0).toFixed(2)}
                 </td>
                 <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700">
-                  ₹{Number(p.net_partner_payout || 594.15).toFixed(2)}
+                  ₹{Number(p.net_partner_payout || 0).toFixed(2)}
                 </td>
               </tr>
             ))}

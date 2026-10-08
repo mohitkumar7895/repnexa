@@ -1,6 +1,9 @@
 import { db } from "@/lib/db";
 import { updatePartnerStatus } from "@/app/actions/portal-actions";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PartnerProofDesk } from "@/components/super-admin/PartnerProofDesk";
+import { DOORSTEP_CHECKS } from "@/lib/verification";
+import { ensurePortalTables } from "@/lib/portal-setup";
 import { DataTable } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { BulkPartnerImportModal } from "@/components/super-admin/BulkPartnerImportModal";
@@ -8,6 +11,7 @@ import { ResetPasswordModal } from "@/components/super-admin/ResetPasswordModal"
 import Link from "next/link";
 
 export default async function SuperAdminPartnersPage() {
+  await ensurePortalTables();
   const [partners]: any = await db.query(`
     SELECT p.*, u.email, u.phone, u.first_name, u.last_name, c.name as city_name, s.name as state_name
     FROM partners p
@@ -16,6 +20,29 @@ export default async function SuperAdminPartnersPage() {
     LEFT JOIN states s ON p.state_id = s.id
     ORDER BY p.id DESC
   `);
+
+  const [checkRows]: any = await db.query(
+    "SELECT partner_id, check_key, status FROM partner_verification_checks"
+  );
+  const deskPartners = (partners || []).map((partner: any) => {
+    const saved = new Map(
+      (checkRows || [])
+        .filter((row: any) => row.partner_id === partner.id)
+        .map((row: any) => [row.check_key, row.status])
+    );
+    return {
+      id: partner.id,
+      partnerCode: partner.partner_code || `PTR-${partner.id}`,
+      businessName: partner.business_name || "Partner",
+      kycStatus: partner.kyc_status || "pending",
+      identityOnFile: Boolean(String(partner.aadhaar_number || "").trim() || String(partner.pan_number || "").trim()),
+      checks: DOORSTEP_CHECKS.map((check) => ({
+        key: check.key,
+        label: check.label,
+        status: saved.get(check.key) || "pending",
+      })),
+    };
+  }).filter((partner: any) => partner.kycStatus !== "approved" || partner.checks.some((check: any) => check.status !== "passed"));
 
   return (
     <div className="space-y-6">
@@ -34,6 +61,14 @@ export default async function SuperAdminPartnersPage() {
           <span>Add Partner Application</span>
         </Link>
       </PageHeader>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-black text-slate-900">Doorstep proof desk</h2>
+          <p className="text-xs text-slate-500">4 checks, then approve. Until then, leads stay locked.</p>
+        </div>
+        <PartnerProofDesk partners={deskPartners} />
+      </section>
 
       <DataTable title="All Service Partners" count={partners.length}>
         <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
@@ -110,16 +145,6 @@ export default async function SuperAdminPartnersPage() {
                       buttonLabel="🔑 Pwd"
                       buttonClassName="px-2 py-1 rounded bg-purple-700 hover:bg-purple-800 text-white font-bold text-2xs uppercase tracking-wider transition-all inline-flex items-center space-x-0.5 cursor-pointer shadow-xs"
                     />
-                    {p.kyc_status !== "approved" && (
-                      <form action={async () => {
-                        "use server";
-                        await updatePartnerStatus(p.id, "approved", "Approved by Super Admin");
-                      }}>
-                        <button type="submit" className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-2xs uppercase">
-                          Approve
-                        </button>
-                      </form>
-                    )}
                     {p.kyc_status === "approved" && (
                       <form action={async () => {
                         "use server";

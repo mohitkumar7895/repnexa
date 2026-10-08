@@ -8,7 +8,7 @@ export default function MasterPortalsDirectoryPage() {
       description: "Complete platform control, dynamic CMS, operations monitoring, staff provisioning, and financial governance.",
       badge: "15 Enterprise Modules",
       badgeColor: "bg-purple-100 text-purple-800 border-purple-200",
-      credentials: "Email: superadmin@repnexa.com | Password: admin123",
+      credentials: "Staff sign in",
       links: [
         { name: "🔐 Super Admin Secure Login", url: "/super-admin/login", desc: "Sign in with password or 1-click demo credentials" },
         { name: "Overview & Real-Time KPIs", url: "/super-admin/dashboard", desc: "Live network metrics, pipeline funnel, action alerts" },
@@ -33,13 +33,13 @@ export default function MasterPortalsDirectoryPage() {
       description: "Dedicated dashboard for service partners to accept leads, execute jobs, upload quality photo proofs, and withdraw earnings.",
       badge: "8 Operations Modules",
       badgeColor: "bg-orange-100 text-orange-800 border-orange-200",
-      credentials: "Email: sharma.ac@repnexa.com | Password: partner123",
+      credentials: "Workshop sign in",
       links: [
         { name: "🔐 Partner Secure Sign In", url: "/partner/login", desc: "Technician & workshop login with 1-click demo credentials" },
         { name: "Partner Operations Dashboard", url: "/partner/dashboard", desc: "Prepaid float counter, readiness status, quick actions" },
         { name: "Available Leads Marketplace", url: "/partner/leads", desc: "Browse unassigned customer leads in your hub" },
         { name: "Active Jobs & Photo Uploads", url: "/partner/jobs", desc: "Execute job milestones, upload Before/After photos & verify OTP" },
-        { name: "🎁 Referrals & Tier Gamification", url: "/partner/referrals", desc: "Invite technicians, track ₹500 referral bonuses & unlock lower commission tiers" },
+        { name: "🎁 Referrals & Tier Gamification", url: "/partner/referrals", desc: "Invite technicians and track referral bonuses" },
         { name: "🪪 Official Digital ID Card", url: "/partner/id-card", desc: "Official verified Repnexa credential badge with QR code & print capability" },
         { name: "Workshop Profile & KYC Info", url: "/partner/profile", desc: "Update workshop address, phone, GST, PAN, Aadhaar & radius" },
         { name: "Float Wallet & Top-up", url: "/partner/wallet", desc: "Prepaid float balance and transaction ledger" },
@@ -51,13 +51,13 @@ export default function MasterPortalsDirectoryPage() {
       description: "Consumer-facing touchpoints for doorstep appliance repair booking, live service tracking, and verified reviews.",
       badge: "Public Access",
       badgeColor: "bg-blue-100 text-blue-800 border-blue-200",
-      credentials: "No password required (Track via Customer Code: CUST-DL-2001)",
+      credentials: "Track with mobile or booking code",
       links: [
         { name: "Homepage & Brand Showcase", url: "/", desc: "Hero banner, 8 appliance categories, trust pillars & how it works" },
         { name: "Book Doorstep Repair", url: "/book", desc: "3-step interactive booking form (Appliance -> Problem -> Address)" },
         { name: "Appliance Services Directory", url: "/services", desc: "Complete catalogue of all active appliance categories" },
         { name: "Customer Service Tracking", url: "/customer/dashboard", desc: "Track technician arrival, OTP, photos & submit star review" },
-        { name: "🔍 Technician Verification Desk", url: "/verify/PTR-DEL-1001", desc: "Scan technician QR code to inspect official government & police verification status" },
+        { name: "🔍 Technician ID", url: "/verify/PTR-DEL-1001", desc: "Green = cleared. Red = stop." },
         { name: "Become a Service Partner", url: "/become-partner", desc: "Public multi-step technician registration & KYC application" },
         { name: "Customer Support & Helpdesk", url: "/support", desc: "Submit queries, call helpline, or file complaint" }
       ]
@@ -79,28 +79,16 @@ export default function MasterPortalsDirectoryPage() {
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
       {/* Top Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <Link href="/" className="flex items-center">
-            <div className="relative w-44 h-12 flex-shrink-0">
-              <Image 
-                src="/logo.png" 
-                alt="Repnexa" 
-                fill 
-                className="object-contain object-left" 
-                priority
-              />
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-2">
+          <Link href="/" className="min-w-0">
+            <div className="relative w-28 sm:w-40 h-9 sm:h-11">
+              <Image src="/logo.png" alt="Repnexa" fill className="object-contain object-left" priority sizes="160px" />
             </div>
           </Link>
-          <div className="flex items-center space-x-3 text-xs font-bold">
-            <Link href="/" className="px-3.5 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100">
-              Home
-            </Link>
-            <Link href="/super-admin/dashboard" className="px-3.5 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800">
-              Super Admin
-            </Link>
-            <Link href="/partner/dashboard" className="px-3.5 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700">
-              Partner Portal
-            </Link>
+          <div className="flex items-center gap-1.5 text-xs font-bold">
+            <Link href="/" className="hidden sm:inline px-3 py-2 rounded-lg border border-slate-300 text-slate-700">Home</Link>
+            <Link href="/super-admin/dashboard" className="px-2.5 py-2 rounded-lg bg-slate-900 text-white">Admin</Link>
+            <Link href="/partner/dashboard" className="px-2.5 py-2 rounded-lg bg-orange-600 text-white">Partner</Link>
           </div>
         </div>
       </header>
@@ -116,7 +104,7 @@ export default function MasterPortalsDirectoryPage() {
             Repnexa Master Access & Portals Directory
           </h1>
           <p className="text-sm text-slate-500 max-w-3xl leading-relaxed">
-            Quick reference guide and 1-click launcher for all 29 live modules, operational consoles, dashboards, customer booking journeys, and administrative panels built into the Repnexa ERP platform.
+            Every portal in one list.
           </p>
         </div>
 

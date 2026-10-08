@@ -25,7 +25,7 @@ export function PageHeader({ title, subtitle, badge, children }: PageHeaderProps
       </div>
 
       {children && (
-        <div className="flex items-center space-x-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {children}
         </div>
       )}

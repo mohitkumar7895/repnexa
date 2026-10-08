@@ -3,8 +3,10 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { revalidatePath } from "next/cache";
+import { ensurePortalTables } from "@/lib/portal-setup";
 
 export default async function SuperAdminCouponsPage() {
+  await ensurePortalTables();
   const [coupons]: any = await db.query("SELECT * FROM coupons ORDER BY id DESC");
 
   return (

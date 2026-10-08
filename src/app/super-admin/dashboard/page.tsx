@@ -69,14 +69,23 @@ export default async function SuperAdminDashboard() {
 
   const totalRev = Number(jobStats[0]?.total_revenue || 0);
   const totalComm = Number(jobStats[0]?.total_commission || 0);
-  const pendingWthCount = withdrawalStats[0]?.pending_withdrawals || 0;
+  const pendingWthCount = Number(withdrawalStats[0]?.pending_withdrawals || 0);
+  const pendingWthAmount = Number(withdrawalStats[0]?.pending_amount || 0);
+  const pipelineTotal = Math.max(Number(lTotal) || 0, 1);
+  const updatedLabel = new Intl.DateTimeFormat("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date());
 
   return (
     <div className="space-y-6">
       {/* 1. Header */}
       <PageHeader
         title="Operations Dashboard"
-        subtitle="Platform metrics, dispatch pipeline & revenue overview"
+        subtitle={`Platform metrics, dispatch pipeline and revenue · Updated ${updatedLabel}`}
         badge="Live"
       >
         <Link 
@@ -109,10 +118,10 @@ export default async function SuperAdminDashboard() {
             </span>
             <span className="text-amber-800">
               {[
-                pPending > 0 ? `${pPending} KYC Pending` : null,
-                pendingWthCount > 0 ? `${pendingWthCount} Payouts` : null,
-                lNew > 0 ? `${lNew} New Leads` : null
-              ].filter(Boolean).join(" • ")}
+                pPending > 0 ? `${pPending} KYC pending` : null,
+                pendingWthCount > 0 ? `${pendingWthCount} payouts · ₹${pendingWthAmount.toLocaleString("en-IN")}` : null,
+                lNew > 0 ? `${lNew} new leads` : null
+              ].filter(Boolean).join(" · ")}
             </span>
           </div>
 
@@ -131,6 +140,14 @@ export default async function SuperAdminDashboard() {
                 className="px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-2xs transition-colors shadow-2xs"
               >
                 Settle Payouts
+              </Link>
+            )}
+            {lNew > 0 && (
+              <Link
+                href="/super-admin/leads"
+                className="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-2xs transition-colors shadow-2xs"
+              >
+                Dispatch Leads
               </Link>
             )}
           </div>
@@ -154,7 +171,7 @@ export default async function SuperAdminDashboard() {
           subtext={`${lCompleted} Done • ${lInProgress} Active`}
           badge={`${lNew + lMatching} Queued`}
           badgeColor="purple"
-          valueColor="text-purple-700"
+          valueColor="text-purple-700 dark:text-purple-300"
           icon="📋"
         />
 
@@ -164,17 +181,17 @@ export default async function SuperAdminDashboard() {
           subtext="Prepaid wallet balance"
           badge="Float"
           badgeColor="emerald"
-          valueColor="text-emerald-700"
+          valueColor="text-emerald-700 dark:text-emerald-400"
           icon="💳"
         />
 
         <StatCard
           label="Platform Revenue"
-          value={`₹${(totalComm || 420).toLocaleString('en-IN')}`}
-          subtext={`15% Take • ₹${(totalRev || 2800).toLocaleString('en-IN')} GMV`}
+          value={`₹${totalComm.toLocaleString('en-IN')}`}
+          subtext={`Commission · ₹${totalRev.toLocaleString('en-IN')} billed`}
           badge="Net"
           badgeColor="orange"
-          valueColor="text-orange-600"
+          valueColor="text-orange-600 dark:text-orange-300"
           icon="📈"
         />
       </div>
@@ -194,29 +211,24 @@ export default async function SuperAdminDashboard() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-          <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/70">
-            <span className="text-3xs font-bold text-slate-400 uppercase tracking-wider block">1. New</span>
-            <div className="text-2xl font-black text-blue-700 mt-1">{lNew}</div>
-            <span className="text-2xs text-slate-500 font-medium">Customer booked</span>
-          </div>
-
-          <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/70">
-            <span className="text-3xs font-bold text-slate-400 uppercase tracking-wider block">2. Matching</span>
-            <div className="text-2xl font-black text-purple-700 mt-1">{lMatching}</div>
-            <span className="text-2xs text-slate-500 font-medium">Broadcasted</span>
-          </div>
-
-          <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/70">
-            <span className="text-3xs font-bold text-slate-400 uppercase tracking-wider block">3. In Progress</span>
-            <div className="text-2xl font-black text-amber-700 mt-1">{lInProgress}</div>
-            <span className="text-2xs text-slate-500 font-medium">Field technician active</span>
-          </div>
-
-          <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/70">
-            <span className="text-3xs font-bold text-slate-400 uppercase tracking-wider block">4. Completed</span>
-            <div className="text-2xl font-black text-emerald-700 mt-1">{lCompleted}</div>
-            <span className="text-2xs text-slate-500 font-medium">OTP verified</span>
-          </div>
+          {[
+            { step: "1. New", value: lNew, hint: "Customer booked", bar: "bg-blue-500", text: "text-blue-700 dark:text-blue-300" },
+            { step: "2. Matching", value: lMatching, hint: "Waiting for a technician", bar: "bg-purple-500", text: "text-purple-700 dark:text-purple-300" },
+            { step: "3. In Progress", value: lInProgress, hint: "Field visit active", bar: "bg-amber-500", text: "text-amber-700 dark:text-amber-300" },
+            { step: "4. Completed", value: lCompleted, hint: "OTP verified", bar: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-300" },
+          ].map((stage) => (
+            <div key={stage.step} className="bg-slate-50/70 dark:bg-slate-950/40 p-3.5 rounded-xl border border-slate-200/70 dark:border-slate-800">
+              <span className="text-3xs font-bold text-slate-400 uppercase tracking-wider block">{stage.step}</span>
+              <div className={`text-2xl font-black mt-1 ${stage.text}`}>{stage.value}</div>
+              <span className="text-2xs text-slate-500 font-medium">{stage.hint}</span>
+              <div className="mt-2 h-1.5 rounded-full bg-slate-200/80 dark:bg-slate-800 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${stage.bar}`}
+                  style={{ width: `${Math.round((Number(stage.value) / pipelineTotal) * 100)}%` }}
+                />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -244,12 +256,21 @@ export default async function SuperAdminDashboard() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
+            {recentLeads.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-10 text-center text-xs text-slate-500">
+                  No leads yet. New customer bookings will appear here.
+                </td>
+              </tr>
+            )}
             {recentLeads.map((lead: any) => (
               <tr key={lead.id} className="hover:bg-slate-50/80 transition-colors">
                 <td className="px-4 py-3 font-mono font-bold text-slate-900">
                   {lead.lead_code}
                   <span className="text-2xs text-slate-400 block font-normal font-sans">
-                    {new Date(lead.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    {lead.created_at
+                      ? new Date(lead.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+                      : "—"}
                   </span>
                 </td>
                 <td className="px-4 py-3 font-medium text-slate-800">
@@ -278,7 +299,7 @@ export default async function SuperAdminDashboard() {
                   )}
                 </td>
                 <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
-                  ₹{Number(lead.lead_fee).toFixed(0)}
+                  ₹{Number(lead.lead_fee || 0).toLocaleString("en-IN")}
                 </td>
               </tr>
             ))}
